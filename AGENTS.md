@@ -14,7 +14,7 @@ The user wants to perform setup and coding themselves. Agents must:
 
 ## Required files
 
-Before working, read:
+Before working, read once:
 
 1. `AGENTS.md`
 2. `PROJECT_CONTEXT.md`

@@ -56,3 +56,13 @@ git remote -v
 systemctl is-active postgresql
 • Confirm Django connects:
 psql -d kazi_salama -c 'SELECT current_database(), current_user;'
+
+## Progress checkpoint
+
+- Created and registered the Django `profiles` app.
+- Created `CareerProfile`.
+- Applied migration `profiles.0001_initial`.
+- PostgreSQL table `profiles_careerprofile` exists.
+- Registered `CareerProfile` in Django Admin.
+- Django system check passes.
+- Migration consistency check passes.
