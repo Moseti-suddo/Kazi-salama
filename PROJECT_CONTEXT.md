@@ -1,6 +1,4 @@
-```markdown
-
-Kazi Salama — Project Context
+# Kazi Salama — Project Context
 
 1. Project
 
@@ -308,18 +306,41 @@ psycopg[binary]==3.3.9
 • Configured Django to use PostgreSQL
 • Created private GitHub repository:
  https://github.com/Moseti-suddo/Kazi-salama.git 
+• Created and registered the Django `profiles` app
+• Created the `CareerProfile` model
+• Applied migration `profiles.0001_initial`
+• Verified PostgreSQL table `profiles_careerprofile`
+• Registered `CareerProfile` in Django Admin
+• Committed checkpoint `e3356ac`
+• Pushed the checkpoint to GitHub
 
 11. Current Position
 
-The project is initialized, but no custom Django application has been created.
+The Django environment is initialized and the first custom application, `profiles`, is registered and working.
 
-The next planned command is:
+CareerProfile currently contains:
 
-python manage.py startapp profiles
+• One-to-one ownership by Django's built-in User
+• Full name
+• Phone number
+• Location
+• Professional summary
+• Portfolio URL
+• Whole-profile confirmation state
+• Creation and update timestamps
 
-That command will create the initial Django  profiles  app files.
+The `profiles_careerprofile` PostgreSQL table exists.
 
-Do not run it or make project changes unless the user explicitly asks.
+The next implementation step is to create the remaining profile models:
+
+1. Education
+2. Experience
+3. Project
+4. Skill
+5. Certification
+6. Achievement
+
+SkillEvidence will be added after these basic models work.
 
 12. Deferred Features
 

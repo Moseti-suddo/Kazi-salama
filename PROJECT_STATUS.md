@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Development environment setup
+Career profile foundation
 
 ## Completed
 
@@ -21,6 +21,15 @@ Development environment setup
 - Initialized the local Git repository
 - Renamed the branch to `main`
 - Added the GitHub remote
+- Created and registered the Django `profiles` app
+- Created the `CareerProfile` model
+- Created migration `profiles.0001_initial`
+- Applied the CareerProfile migration to PostgreSQL
+- Created PostgreSQL table `profiles_careerprofile`
+- Registered `CareerProfile` in Django Admin
+- Verified Django system checks pass
+- Verified migration consistency
+- Committed and pushed the CareerProfile checkpoint
 
 ## Files in the local project
 
@@ -32,6 +41,7 @@ Development environment setup
 - `PROJECT_CONTEXT.md`
 - `PROJECT_STATUS.md`
 - `DECISIONS.md`
+- `profiles/`
 
 ## Current blocker
 
@@ -41,12 +51,16 @@ PostgreSQL must be active for Django database commands.
 
 ## Exact next step
 
-Create the first custom Django app:
+Create the remaining career-profile models:
 
-```bash
-python manage.py startapp profiles
+1. `Education`
+2. `Experience`
+3. `Project`
+4. `Skill`
+5. `Certification`
+6. `Achievement`
 
-Do not run it or change files until ready to continue with the user-guided app setup.
+Add them one model at a time. Add SkillEvidence after the basic models are working and migrated.
 
 Verification needed before coding
 
@@ -59,6 +73,7 @@ psql -d kazi_salama -c 'SELECT current_database(), current_user;'
 
 ## Progress checkpoint
 
+- Commit: `e3356ac` — `Add CareerProfile model and migration`
 - Created and registered the Django `profiles` app.
 - Created `CareerProfile`.
 - Applied migration `profiles.0001_initial`.
@@ -66,3 +81,7 @@ psql -d kazi_salama -c 'SELECT current_database(), current_user;'
 - Registered `CareerProfile` in Django Admin.
 - Django system check passes.
 - Migration consistency check passes.
+
+## Panel explanation
+
+The career profile is implemented as one database record per Django user. PostgreSQL stores the profile fields, while Django migrations define how the table is created and protect database consistency.
