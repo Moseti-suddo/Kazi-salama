@@ -1,21 +1,18 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Sign in | Kazi Salama</title>
-</head>
-<body>
-    <h1>Sign in to Kazi Salama</h1>
+{% extends "base.html" %}
 
-    {% if form.errors %}
-        <p>Invalid username or password.</p>
-    {% endif %}
+{% block title %}Sign in | Kazi Salama{% endblock %}
 
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <input type="hidden" name="next" value="{{ next }}">
-        <button type="submit">Sign in</button>
-    </form>
-</body>
-</html>
+{% block content %}
+<h1>Sign in to Kazi Salama</h1>
+
+{% if form.errors %}
+    <p class="msg-error">Invalid username or password.</p>
+{% endif %}
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit">Sign in</button>
+</form>
+{% endblock %}

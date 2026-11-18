@@ -1,10 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Education | Kazi Salama{% endblock %}
+
+{% block content %}
 <h1>Education</h1>
 
 <ul>
     {% for education in education_entries %}
         <li>
-            {{ education.institution }} —
-            {{ education.qualification }} —
+            {{ education.institution }} -
+            {{ education.qualification }} -
             {{ education.field_of_study }}
         </li>
     {% empty %}
@@ -19,3 +24,4 @@
     {{ form.as_p }}
     <button type="submit">Save education</button>
 </form>
+{% endblock %}
