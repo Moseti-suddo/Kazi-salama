@@ -8,6 +8,11 @@ from .views import (
     skill_list,
     experience_confirm,
     experience_list,
+    advert_list,
+    advert_detail, 
+    advert_override, 
+    advert_status,
+    advert_delete,
 )
 
 urlpatterns = [
@@ -19,4 +24,9 @@ urlpatterns = [
     path("profile/skills/<int:pk>/confirm/", skill_confirm, name="skill_confirm"),
     path("profile/experience/", experience_list, name="experience_list"),
     path("profile/experience/<int:pk>/confirm/", experience_confirm, name="experience_confirm"),
+    path("adverts/", advert_list, name="advert_list"),
+    path("adverts/<int:pk>/", advert_detail, name="advert_detail"),
+    path("adverts/<int:pk>/override/", advert_override, name="advert_override"),
+    path("adverts/<int:pk>/status/", advert_status, name="advert_status"),
+    path("adverts/<int:pk>/delete/", advert_delete, name="advert_delete"),
 ]

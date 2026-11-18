@@ -170,3 +170,36 @@ class Achievement(models.Model):
 
     def __str__(self):
         return self.title
+
+class Advert(models.Model):
+    class Status(models.TextChoices):
+        SAVED = "saved", "Saved"
+        PREPARING = "preparing", "Preparing application"
+        SUBMITTED = "submitted", "Submitted externally"
+        INTERVIEW = "interview", "Interview"
+        OFFER = "offer", "Offer received"
+        REJECTED = "rejected", "Rejected"
+        WITHDRAWN = "withdrawn", "Withdrawn"
+
+    profile = models.ForeignKey(CareerProfile, on_delete=models.CASCADE, related_name="adverts")
+    title = models.CharField(max_length=200)
+    company = models.CharField(max_length=200, blank=True)
+    source_url = models.URLField(blank=True)
+    text = models.TextField()
+    risk_level = models.CharField(max_length=10)
+    risk_score = models.PositiveIntegerField(default=0)
+    indicators = models.JSONField(default=list)
+    matched = models.JSONField(default=list)
+    missing = models.JSONField(default=list)
+    match_score = models.PositiveIntegerField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SAVED)
+    deadline = models.DateField(blank=True, null=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.title

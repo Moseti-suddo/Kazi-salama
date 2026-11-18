@@ -1,6 +1,5 @@
 from django import forms
-from .models import CareerProfile, Education, Experience, Skill
-
+from .models import Advert, CareerProfile, Education, Experience, Skill
 class CareerProfileForm(forms.ModelForm):
     class Meta:
         model = CareerProfile
@@ -64,4 +63,13 @@ class ExperienceForm(forms.ModelForm):
             "start_date": forms.DateInput(attrs={"type": "date"}),
             "end_date": forms.DateInput(attrs={"type": "date"}),
             "responsibilities": forms.Textarea(attrs={"rows": 4}),
+        }
+
+class AdvertForm(forms.ModelForm):
+    class Meta:
+        model = Advert
+        fields = ["title", "company", "source_url", "text", "deadline"]
+        widgets = {
+            "text": forms.Textarea(attrs={"rows": 10}),
+            "deadline": forms.DateInput(attrs={"type": "date"}),
         }

@@ -9,7 +9,15 @@
     <div class="card">
         <div class="muted">{{ card.name }}</div>
         <div class="big">{{ card.total }}</div>
-        {% if card.total == 0 %}
+        {% if card.is_advert %}
+            {% if card.total == 0 %}
+                <span class="muted">Nothing screened yet</span>
+            {% elif card.high_risk %}
+                <span class="badge warn">{{ card.high_risk }} high risk</span>
+            {% else %}
+                <span class="badge ok">No high-risk adverts</span>
+            {% endif %}
+        {% elif card.total == 0 %}
             <span class="muted">Nothing added yet</span>
         {% elif card.unconfirmed %}
             <span class="badge warn">{{ card.unconfirmed }} unconfirmed</span>

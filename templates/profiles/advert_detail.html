@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ advert.title }} | Kazi Salama{% endblock %}
+{% block content %}
+<h1>{{ advert.title }}</h1>
+<p class="lead">{{ advert.company }}</p>
+
+<h2>Scam-risk screening</h2>
+<p><span class="badge {% if advert.risk_level == 'Low' %}ok{% else %}warn{% endif %}">{{ advert.risk_level }} risk</span>
+   <span class="muted">score {{ advert.risk_score }}/100</span></p>
+<ul>
+    {% for i in advert.indicators %}<li>{{ i }}</li>{% empty %}<li>No warning indicators detected.</li>{% endfor %}
+</ul>
+{% if advert.risk_level == "High" %}
+<p>This advert shows several strong warning signs. Verify the employer independently before sharing any details or paying anything.</p>
+{% elif advert.risk_level == "Medium" %}
+<p>Some warning signs were found. Check the employer's official website and contacts first.</p>
+{% else %}
+<p>No major indicators found, but always verify the employer yourself.</p>
+{% endif %}
+<p class="muted">This is a warning indicator, not proof of fraud.</p>
+
+<h2>Skill match</h2>
+{% if advert.match_score == None %}
+    <p>Matching was skipped because this advert is High risk.</p>
+    <form method="post" action="{% url 'advert_override' advert.pk %}">{% csrf_token %}
+        <button type="submit" class="btn-small">I understand the risk, match anyway</button></form>
+{% else %}
+    <div class="card"><div class="muted">Match score</div><div class="big">{{ advert.match_score }}%</div>
+        <span class="muted">matched ÷ skills the advert mentions (confirmed skills only)</span></div>
+    <h3>Matched</h3>
+    <ul>{% for s in advert.matched %}<li>{{ s }}</li>{% empty %}<li>None</li>{% endfor %}</ul>
+    <h3>Missing</h3>
+    <ul>{% for s in advert.missing %}<li>{{ s }}</li>{% empty %}<li>None</li>{% endfor %}</ul>
+{% endif %}
+
+<h2>Application status</h2>
+<form method="post" action="{% url 'advert_status' advert.pk %}">{% csrf_token %}
+    <select name="status">
+        {% for value, label in statuses %}<option value="{{ value }}" {% if value == advert.status %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <p></p><button type="submit">Update status</button>
+</form>
+
+<h2>Remove</h2>
+<form method="post" action="{% url 'advert_delete' advert.pk %}" onsubmit="return confirm('Delete this advert?');">
+    {% csrf_token %}
+    <button type="submit" class="btn-small">Delete advert</button>
+</form>
+{% endblock %}

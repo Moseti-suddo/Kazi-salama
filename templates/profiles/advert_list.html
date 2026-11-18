@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Adverts | Kazi Salama{% endblock %}
+{% block content %}
+<h1>Job adverts</h1>
+<p class="lead">Paste an advert to screen it for scam indicators and match it to your confirmed skills.</p>
+
+<ul>
+    {% for a in adverts %}
+    <li class="entry">
+        <div><strong><a href="{% url 'advert_detail' a.pk %}">{{ a.title }}</a></strong><br>
+            <span class="muted">{{ a.company }} · {{ a.get_status_display }}</span></div>
+        <span class="badge {% if a.risk_level == 'Low' %}ok{% else %}warn{% endif %}">{{ a.risk_level }} risk</span>
+    </li>
+    {% empty %}<li>No adverts yet.</li>{% endfor %}
+</ul>
+
+<h2>Screen a new advert</h2>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Screen advert</button></form>
+{% endblock %}

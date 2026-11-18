@@ -2,8 +2,17 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .forms import CareerProfileForm, EducationForm, ExperienceForm, SkillForm
-from .models import CareerProfile, Education, Experience, Skill
+from .forms import (
+    AdvertForm,
+    CareerProfileForm,
+    EducationForm,
+    ExperienceForm,
+    SkillForm,
+)
+from .matching import match_skills
+from .models import Advert, CareerProfile, Education, Experience, Skill
+from .scam import screen_advert
+
 
 def get_profile(user):
     profile, _ = CareerProfile.objects.get_or_create(
@@ -58,6 +67,7 @@ def education_confirm(request, pk):
     entry.save(update_fields=["is_confirmed", "updated_at"])
     return redirect("education_list")
 
+
 @login_required
 def dashboard(request):
     profile = get_profile(request.user)
@@ -80,7 +90,18 @@ def dashboard(request):
             "unconfirmed": total - confirmed,
             "url_name": url_name,
         })
+
+    adverts = profile.adverts.all()
+    cards.append({
+        "name": "Adverts",
+        "total": adverts.count(),
+        "high_risk": adverts.filter(risk_level="High").count(),
+        "url_name": "advert_list",
+        "is_advert": True,
+    })
+
     return render(request, "profiles/dashboard.html", {"profile": profile, "cards": cards})
+
 
 @login_required
 def skill_list(request):
@@ -112,6 +133,7 @@ def skill_confirm(request, pk):
     skill.save(update_fields=["is_confirmed", "updated_at"])
     return redirect("skill_list")
 
+
 @login_required
 def experience_list(request):
     profile = get_profile(request.user)
@@ -141,3 +163,74 @@ def experience_confirm(request, pk):
     entry.is_confirmed = not entry.is_confirmed
     entry.save(update_fields=["is_confirmed", "updated_at"])
     return redirect("experience_list")
+
+
+def _run_match(advert):
+    names = advert.profile.skills.filter(is_confirmed=True).values_list("name", flat=True)
+    result = match_skills(advert.text, names)
+    advert.matched = result["matched"]
+    advert.missing = result["missing"]
+    advert.match_score = result["score"]
+
+
+@login_required
+def advert_list(request):
+    profile = get_profile(request.user)
+    if request.method == "POST":
+        form = AdvertForm(request.POST)
+        if form.is_valid():
+            advert = form.save(commit=False)
+            advert.profile = profile
+            risk = screen_advert(advert.text)
+            advert.risk_level = risk["level"]
+            advert.risk_score = risk["score"]
+            advert.indicators = risk["indicators"]
+            if risk["level"] != "High":
+                _run_match(advert)
+            advert.save()
+            return redirect("advert_detail", pk=advert.pk)
+    else:
+        form = AdvertForm()
+    return render(
+        request,
+        "profiles/advert_list.html",
+        {"adverts": Advert.objects.filter(profile=profile), "form": form},
+    )
+
+
+@login_required
+def advert_detail(request, pk):
+    advert = get_object_or_404(Advert, pk=pk, profile__user=request.user)
+    return render(
+        request,
+        "profiles/advert_detail.html",
+        {"advert": advert, "statuses": Advert.Status.choices},
+    )
+
+
+@login_required
+@require_POST
+def advert_override(request, pk):
+    advert = get_object_or_404(Advert, pk=pk, profile__user=request.user)
+    _run_match(advert)
+    advert.save()
+    return redirect("advert_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def advert_status(request, pk):
+    advert = get_object_or_404(Advert, pk=pk, profile__user=request.user)
+    new = request.POST.get("status")
+    if new in Advert.Status.values:
+        advert.status = new
+        advert.save(update_fields=["status", "updated_at"])
+    return redirect("advert_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def advert_delete(request, pk):
+    advert = get_object_or_404(Advert, pk=pk, profile__user=request.user)
+    advert.delete()
+    return redirect("advert_list")
