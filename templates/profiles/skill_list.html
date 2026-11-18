@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Skills | Kazi Salama{% endblock %}
+
+{% block content %}
+<h1>Skills</h1>
+<p class="lead">Only confirmed skills are used for job matching.</p>
+
+<ul>
+    {% for skill in skills %}
+        <li class="entry">
+            <div>
+                <strong>{{ skill.name }}</strong><br>
+                <span class="muted">
+                    {{ skill.get_category_display }}{% if skill.proficiency %} · {{ skill.get_proficiency_display }}{% endif %}
+                </span>
+            </div>
+            <div class="entry-actions">
+                {% if skill.is_confirmed %}
+                    <span class="badge ok">Confirmed</span>
+                {% else %}
+                    <span class="badge warn">Unconfirmed</span>
+                {% endif %}
+                <form method="post" action="{% url 'skill_confirm' skill.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-small">
+                        {% if skill.is_confirmed %}Unconfirm{% else %}Confirm{% endif %}
+                    </button>
+                </form>
+            </div>
+        </li>
+    {% empty %}
+        <li>No skills yet.</li>
+    {% endfor %}
+</ul>
+
+<h2>Add a skill</h2>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save skill</button>
+</form>
+{% endblock %}

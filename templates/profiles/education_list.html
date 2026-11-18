@@ -7,10 +7,24 @@
 
 <ul>
     {% for education in education_entries %}
-        <li>
-            {{ education.institution }} -
-            {{ education.qualification }} -
-            {{ education.field_of_study }}
+        <li class="entry">
+            <div>
+                <strong>{{ education.qualification }}</strong> · {{ education.field_of_study }}<br>
+                <span class="muted">{{ education.institution }}</span>
+            </div>
+            <div class="entry-actions">
+                {% if education.is_confirmed %}
+                    <span class="badge ok">Confirmed</span>
+                {% else %}
+                    <span class="badge warn">Unconfirmed</span>
+                {% endif %}
+                <form method="post" action="{% url 'education_confirm' education.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-small">
+                        {% if education.is_confirmed %}Unconfirm{% else %}Confirm{% endif %}
+                    </button>
+                </form>
+            </div>
         </li>
     {% empty %}
         <li>No education entries yet.</li>

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Experience | Kazi Salama{% endblock %}
+
+{% block content %}
+<h1>Experience</h1>
+<p class="lead">Employment, internships and volunteering. Only confirmed entries are used for matching.</p>
+
+<ul>
+    {% for entry in entries %}
+        <li class="entry">
+            <div>
+                <strong>{{ entry.role }}</strong> · {{ entry.organisation }}<br>
+                <span class="muted">
+                    {{ entry.get_experience_type_display }}{% if entry.is_current %} · Current{% endif %}
+                </span>
+            </div>
+            <div class="entry-actions">
+                {% if entry.is_confirmed %}
+                    <span class="badge ok">Confirmed</span>
+                {% else %}
+                    <span class="badge warn">Unconfirmed</span>
+                {% endif %}
+                <form method="post" action="{% url 'experience_confirm' entry.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-small">
+                        {% if entry.is_confirmed %}Unconfirm{% else %}Confirm{% endif %}
+                    </button>
+                </form>
+            </div>
+        </li>
+    {% empty %}
+        <li>No experience entries yet.</li>
+    {% endfor %}
+</ul>
+
+<h2>Add experience</h2>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save experience</button>
+</form>
+{% endblock %}

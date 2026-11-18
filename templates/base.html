@@ -55,12 +55,27 @@
         .errorlist { color: var(--coral); list-style: none; padding: 0; margin: 0 0 6px; font-size: .9rem; }
         button[type=submit] { background: var(--green); color: #fff; border: 0; padding: 11px 24px; border-radius: 999px; font: inherit; font-weight: 500; cursor: pointer; }
         button[type=submit]:hover { background: #17462f; }
+        button.navlink[type=submit] { background: none; color: var(--ink); padding: 10px 12px; border-radius: 10px; font-weight: 500; }
+        button.navlink[type=submit]:hover { background: var(--panel); }
 
         /* Lists inside content */
         .content ul { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 8px; }
         .content ul li { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; }
         .msg-error { background: var(--coral-tint); color: #9c2f10; padding: 10px 14px; border-radius: 12px; margin-bottom: 16px; }
 
+        .muted { color: var(--muted); font-size: .9rem; }
+        .entry { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+        .entry-actions { display: flex; align-items: center; gap: 10px; }
+        .entry-actions form { margin: 0; }
+        .badge { font-size: .78rem; font-weight: 500; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+        .badge.ok { background: var(--green-tint); color: var(--green); }
+        .badge.warn { background: var(--coral-tint); color: #9c2f10; }
+        button.btn-small { background: transparent; color: var(--green); border: 1px solid var(--green); padding: 5px 14px; font-size: .85rem; }
+        button.btn-small:hover { background: var(--green-tint); }
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+        .card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 8px; align-content: start; }
+        .card .big { font-family: var(--serif); font-size: 2.6rem; line-height: 1; }
+        .card a { color: var(--green); font-weight: 500; text-decoration: none; }
         @media (max-width: 760px) {
             .shell { grid-template-columns: 1fr; }
             .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
@@ -75,6 +90,10 @@
     <aside class="sidebar">
         <a class="brand" href="{% url 'profile_edit' %}">Kazi Salama</a>
 
+        <a class="navlink {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+            Dashboard
+        </a>
         <a class="navlink {% if request.resolver_match.url_name == 'profile_edit' %}active{% endif %}" href="{% url 'profile_edit' %}">
             <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Profile
@@ -83,6 +102,14 @@
             <svg viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
             Education
         </a>
+        <a class="navlink {% if request.resolver_match.url_name == 'skill_list' %}active{% endif %}" href="{% url 'skill_list' %}">
+            <svg viewBox="0 0 24 24"><path d="m12 3 2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg>
+            Skills
+        </a>
+        <a class="navlink {% if request.resolver_match.url_name == 'experience_list' %}active{% endif %}" href="{% url 'experience_list' %}">
+        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        Experience
+    </a>
 
         <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}
