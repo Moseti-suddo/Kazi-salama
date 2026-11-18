@@ -313,10 +313,14 @@ psycopg[binary]==3.3.9
 • Registered `CareerProfile` in Django Admin
 • Committed checkpoint `e3356ac`
 • Pushed the checkpoint to GitHub
+• Created browser pages for CareerProfile and Education
+• Added login URL support and a login template
+• Added native date pickers to the Education form
+• Created and applied migrations for all basic profile models
 
 11. Current Position
 
-The Django environment is initialized and the first custom application, `profiles`, is registered and working.
+The Django environment is initialized and the `profiles` application is registered and working.
 
 CareerProfile currently contains:
 
@@ -331,16 +335,22 @@ CareerProfile currently contains:
 
 The `profiles_careerprofile` PostgreSQL table exists.
 
-The next implementation step is to create the remaining profile models:
+The following profile tables also exist:
 
-1. Education
-2. Experience
-3. Project
-4. Skill
-5. Certification
-6. Achievement
+• `profiles_education`
+• `profiles_experience`
+• `profiles_project`
+• `profiles_skill`
+• `profiles_certification`
+• `profiles_achievement`
 
-SkillEvidence will be added after these basic models work.
+Working browser routes:
+
+• `/accounts/login/` — sign in
+• `/profile/` — create and edit CareerProfile
+• `/profile/education/` — list and add education
+
+The next implementation step is to add forms and browser pages for Experience, Projects, Skills, Certifications and Achievements. SkillEvidence will be added after these entry forms are stable.
 
 12. Deferred Features
 

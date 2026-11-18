@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Career profile foundation
+Career profile models and initial browser UI
 
 ## Completed
 
@@ -30,6 +30,15 @@ Career profile foundation
 - Verified Django system checks pass
 - Verified migration consistency
 - Committed and pushed the CareerProfile checkpoint
+- Created CareerProfile and Education browser forms
+- Added login, logout and password URL support
+- Added login template
+- Added `/profile/` and `/profile/education/` routes
+- Verified CareerProfile page in browser
+- Verified Education page and Education creation in browser
+- Added native date widgets to EducationForm
+- Added migrations for Education, Experience, Project, Skill, Certification and Achievement
+- Verified all profile tables exist in PostgreSQL
 
 ## Files in the local project
 
@@ -51,16 +60,13 @@ PostgreSQL must be active for Django database commands.
 
 ## Exact next step
 
-Create the remaining career-profile models:
+Continue the profile workflow:
 
-1. `Education`
-2. `Experience`
-3. `Project`
-4. `Skill`
-5. `Certification`
-6. `Achievement`
-
-Add them one model at a time. Add SkillEvidence after the basic models are working and migrated.
+1. Add forms for Experience, Projects, Skills, Certifications and Achievements
+2. Create repeatable list/create pages for those sections
+3. Add individual confirmation and edit/remove actions
+4. Add a profile wizard and review screen
+5. Add SkillEvidence after the profile entry forms are stable
 
 Verification needed before coding
 
