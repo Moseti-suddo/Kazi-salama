@@ -9,7 +9,7 @@ from .forms import (
     ExperienceForm,
     SkillForm,
 )
-from .matching import match_skills
+from .matching import match_skills, _found
 from .models import Advert, CareerProfile, Education, Experience, Skill
 from .scam import screen_advert
 
@@ -234,3 +234,41 @@ def advert_delete(request, pk):
     advert = get_object_or_404(Advert, pk=pk, profile__user=request.user)
     advert.delete()
     return redirect("advert_list")
+
+def _relevance(text, keywords):
+    return sum(1 for k in keywords if _found(k, text))
+
+
+@login_required
+def advert_resume(request, pk):
+    advert = get_object_or_404(Advert, pk=pk, profile__user=request.user)
+    if advert.match_score is None:
+        return redirect("advert_detail", pk=pk)
+
+    profile = advert.profile
+    confirmed_skills = list(profile.skills.filter(is_confirmed=True))
+    result = match_skills(advert.text, [s.name for s in confirmed_skills])
+    keywords = result["matched"]
+
+    skills = sorted(confirmed_skills, key=lambda s: (s.name.lower() not in keywords, s.name.lower()))
+    experience = sorted(
+        profile.experience_entries.filter(is_confirmed=True).order_by("-start_date"),
+        key=lambda e: -_relevance(f"{e.technologies} {e.responsibilities}", keywords),
+    )
+    projects = sorted(
+        profile.project_entries.filter(is_confirmed=True),
+        key=lambda p: -_relevance(f"{p.technologies} {p.description}", keywords),
+    )
+    education = profile.education_entries.filter(is_confirmed=True)
+
+    return render(request, "profiles/resume.html", {
+        "advert": advert,
+        "profile": profile,
+        "email": request.user.email,
+        "skills": skills,
+        "experience": experience,
+        "projects": projects,
+        "education": education,
+        "keywords": keywords,
+        "has_content": bool(skills or experience or projects or education),
+    })

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ profile.full_name }} - Resume</title>
+<style>
+    body { font-family: Georgia, "Times New Roman", serif; color: #111; background: #fff; max-width: 800px; margin: 32px auto; padding: 0 24px; line-height: 1.45; font-size: 14px; }
+    h1 { margin: 0; font-size: 28px; }
+    h2 { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; border-bottom: 1px solid #999; padding-bottom: 3px; margin: 22px 0 8px; }
+    .contact { color: #444; margin: 4px 0 0; }
+    .row { display: flex; justify-content: space-between; gap: 12px; }
+    .item { margin-bottom: 10px; }
+    .meta { color: #555; }
+    .toolbar { font-family: system-ui, sans-serif; font-size: 13px; background: #eef0e8; border: 1px solid #ccd; padding: 10px 14px; border-radius: 8px; margin-bottom: 24px; }
+    .toolbar button { margin-left: 8px; padding: 6px 14px; border-radius: 999px; border: 0; background: #1f5a3f; color: #fff; cursor: pointer; }
+    @media print { .toolbar { display: none; } body { margin: 0; } }
+</style>
+</head>
+<body>
+<div class="toolbar">
+    Tailored for <strong>{{ advert.title }}</strong>{% if advert.company %} at {{ advert.company }}{% endif %}.
+    Only your confirmed entries are included. Review it before sending.
+    <button onclick="window.print()">Print / Save as PDF</button>
+    {% if not has_content %}<br>No confirmed entries yet. Confirm some skills and experience first.{% endif %}
+</div>
+
+<h1>{{ profile.full_name }}</h1>
+<p class="contact">
+    {% if profile.location %}{{ profile.location }}{% endif %}
+    {% if profile.phone_number %} · {{ profile.phone_number }}{% endif %}
+    {% if email %} · {{ email }}{% endif %}
+    {% if profile.portfolio_url %} · {{ profile.portfolio_url }}{% endif %}
+</p>
+
+{% if profile.professional_summary %}
+<h2>Summary</h2>
+<p>{{ profile.professional_summary|linebreaksbr }}</p>
+{% endif %}
+
+{% if skills %}
+<h2>Skills</h2>
+<p>{% for s in skills %}{{ s.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+{% endif %}
+
+{% if experience %}
+<h2>Experience</h2>
+{% for e in experience %}
+<div class="item">
+    <div class="row"><strong>{{ e.role }}, {{ e.organisation }}</strong>
+        <span class="meta">{% if e.start_date %}{{ e.start_date|date:"M Y" }} - {% if e.is_current %}Present{% elif e.end_date %}{{ e.end_date|date:"M Y" }}{% endif %}{% endif %}</span></div>
+    <div>{{ e.responsibilities|linebreaksbr }}</div>
+    {% if e.technologies %}<div class="meta">Technologies: {{ e.technologies }}</div>{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if projects %}
+<h2>Projects</h2>
+{% for p in projects %}
+<div class="item">
+    <strong>{{ p.name }}</strong> <span class="meta">({{ p.role }})</span>
+    <div>{{ p.description|linebreaksbr }}</div>
+    <div class="meta">Technologies: {{ p.technologies }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if education %}
+<h2>Education</h2>
+{% for ed in education %}
+<div class="item">
+    <div class="row"><strong>{{ ed.qualification }}, {{ ed.field_of_study }}</strong>
+        <span class="meta">{% if ed.end_date %}{{ ed.end_date|date:"Y" }}{% endif %}</span></div>
+    <div class="meta">{{ ed.institution }}</div>
+</div>
+{% endfor %}
+{% endif %}
+</body>
+</html>

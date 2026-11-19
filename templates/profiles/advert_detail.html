@@ -33,6 +33,12 @@
     <ul>{% for s in advert.missing %}<li>{{ s }}</li>{% empty %}<li>None</li>{% endfor %}</ul>
 {% endif %}
 
+{% if advert.match_score != None %}
+<h2>Tailored resume</h2>
+<p class="muted">Built from your confirmed entries only, reordered to fit this advert.</p>
+<a class="btn-new" style="display:inline-flex; padding: 11px 24px;" href="{% url 'advert_resume' advert.pk %}" target="_blank">Generate resume</a>
+{% endif %}
+
 <h2>Application status</h2>
 <form method="post" action="{% url 'advert_status' advert.pk %}">{% csrf_token %}
     <select name="status">

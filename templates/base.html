@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>    
     <title>{% block title %}Kazi Salama{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -76,6 +77,24 @@
         .card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 8px; align-content: start; }
         .card .big { font-family: var(--serif); font-size: 2.6rem; line-height: 1; }
         .card a { color: var(--green); font-weight: 500; text-decoration: none; }
+        .btn-new { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 12px; padding: 11px 14px; border-radius: 999px; background: var(--green); color: #fff; text-decoration: none; font-weight: 500; }
+        .btn-new:hover { background: #17462f; }
+        .btn-new svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+        .side-footer { margin-top: auto; border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 4px; }
+        .user-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px 0 12px; }
+        .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; font-size: .8rem; font-weight: 600; flex: none; }
+        .user-meta { flex: 1; min-width: 0; line-height: 1.25; }
+        .user-meta strong { display: block; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sidebar .side-footer form { margin: 0; }
+        .icon-btn { background: none; border: 0; padding: 8px; border-radius: 8px; cursor: pointer; color: var(--muted); display: grid; }
+        .icon-btn:hover { background: var(--panel); }
+        .icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+        :root[data-theme="dark"] { --bg: #121614; --panel: #1a201c; --line: #2b332d; --ink: #e8ece8; --muted: #98a29a; --green: #5fbf8f; --green-tint: #1f3a2c; --coral: #ff7a55; --coral-tint: #3a211a; }
+        :root[data-theme="dark"] :is(input, select, textarea, .card, .content ul li) { background: #222a25; }
+        :root[data-theme="dark"] :is(button[type=submit], .btn-new, .avatar) { color: #0f1a14; }
+        :root[data-theme="dark"] :is(button[type=submit], .btn-new):hover { background: #7fd1a8; }
+        :root[data-theme="dark"] :is(.badge.warn, .msg-error) { color: #ffb199; }       
         @media (max-width: 760px) {
             .shell { grid-template-columns: 1fr; }
             .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
@@ -87,8 +106,13 @@
 <body class="{% if user.is_authenticated %}app{% else %}guest{% endif %}">
 <div class="shell">
     {% if user.is_authenticated %}
-    <aside class="sidebar">
+        <aside class="sidebar">
         <a class="brand" href="{% url 'profile_edit' %}">Kazi Salama</a>
+
+        <a class="btn-new" href="{% url 'advert_list' %}">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            New application
+        </a>
 
         <a class="navlink {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
@@ -107,21 +131,33 @@
             Skills
         </a>
         <a class="navlink {% if request.resolver_match.url_name == 'experience_list' %}active{% endif %}" href="{% url 'experience_list' %}">
-        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-        Experience
+            <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            Experience
         </a>
         <a class="navlink {% if request.resolver_match.url_name == 'advert_list' %}active{% endif %}" href="{% url 'advert_list' %}">
             <svg viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg>
             Adverts
         </a>
 
-        <form method="post" action="{% url 'logout' %}">
-            {% csrf_token %}
-            <button type="submit" class="navlink">
-                <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
-                Sign out
+        <div class="side-footer">
+            <button type="button" class="navlink" id="theme-toggle">
+                <svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+                Dark mode
             </button>
-        </form>
+            <div class="user-row">
+                <div class="avatar">{{ user.username|slice:":2"|upper }}</div>
+                <div class="user-meta">
+                    <strong>{{ user.get_full_name|default:user.username }}</strong>
+                    <span class="muted">Kazi Salama · MVP</span>
+                </div>
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="icon-btn" title="Sign out" aria-label="Sign out">
+                        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+                    </button>
+                </form>
+            </div>
+        </div>
     </aside>
     {% endif %}
 
@@ -131,5 +167,12 @@
         </div>
     </main>
 </div>
+<script>
+document.getElementById('theme-toggle')?.addEventListener('click', function () {
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch (e) {}
+});
+</script>
 </body>
 </html>

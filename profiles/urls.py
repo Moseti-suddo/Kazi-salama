@@ -13,6 +13,7 @@ from .views import (
     advert_override, 
     advert_status,
     advert_delete,
+    advert_resume,
 )
 
 urlpatterns = [
@@ -29,4 +30,5 @@ urlpatterns = [
     path("adverts/<int:pk>/override/", advert_override, name="advert_override"),
     path("adverts/<int:pk>/status/", advert_status, name="advert_status"),
     path("adverts/<int:pk>/delete/", advert_delete, name="advert_delete"),
+    path("adverts/<int:pk>/resume/", advert_resume, name="advert_resume"),
 ]
