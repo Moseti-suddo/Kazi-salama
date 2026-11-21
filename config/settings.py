@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'accounts.apps.AccountsConfig',
     'profiles.apps.ProfilesConfig',
 ]
 
@@ -119,6 +120,15 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+
+
+
+# Primary key type for models that don't declare their own id field.
+# Set explicitly so the result doesn't depend on which Django version runs makemigrations.
+# https://docs.djangoproject.com/en/6.1/ref/settings/#default-auto-field
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 
 
 # Email
