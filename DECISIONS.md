@@ -52,6 +52,20 @@ Labels and help text are set in the form, not the model, so no migration was nee
 
 Personal details have no Remove action. Deleting `CareerProfile` would cascade and delete every profile entry and advert. Users can clear the optional fields instead.
 
+## Education (Feature 3, 2026-11-23)
+
+No model fields were added; the existing fields match the spec.
+
+"Expected completion" is a future `end_date`, labelled "End date or expected completion". The `is_expected` property (end date after today in Africa/Nairobi) is computed when the page is shown. An `is_expected` or `is_current` checkbox was rejected because it needs a migration and allows contradictions such as a ticked box with a past date.
+
+An end date before the start date is rejected in `EducationForm.clean()`, with the error on `end_date`. Equal dates and blank dates are allowed. A database `CheckConstraint` was rejected because it needs a migration that fails if any existing row breaks the rule. `Model.clean()` was rejected to keep validation in forms, like the phone and email rules. Experience and Projects need the same rule; it should become a shared helper in Feature 4, once there is a second use.
+
+Ordering is explicit: blank end dates first (usually still studying), then newest end date, then start date, then `-created_at` so the order never depends on chance. This needed migration 0008, which runs no SQL. The ordering stays in `Meta` because the dashboard and resume rely on it too.
+
+Edit is a separate page (`/profile/education/<pk>/edit/`). Editing inside the list page was rejected because it mixes two forms in one view, and HTMX is deferred. Remove is POST only with a browser confirm prompt, the same as advert delete; a separate confirmation page was rejected as an extra view and template. Edit, remove and confirm all look up entries with `profile__user=request.user`, so another user's entry returns 404.
+
+Date inputs use `format="%Y-%m-%d"`, because browser date inputs only accept that format. Without it a saved date could show as blank on the edit page and be wiped on save.
+
 ## Confirmation
 
 Every profile entry must be reviewed and confirmed individually. Personal details count as one entry, confirmed with the `profile_confirmed` flag (toggled at `/profile/confirm/`). Personal details can only be confirmed once full name and email are filled in.

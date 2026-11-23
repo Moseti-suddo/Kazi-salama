@@ -1,5 +1,7 @@
 
 from django.db import models
+from django.db.models import F
+from django.utils import timezone
 
 from django.conf import settings
 
@@ -40,10 +42,18 @@ class Education(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-end_date", "-start_date"]
+        ordering = [
+            F("end_date").desc(nulls_first=True),
+            F("start_date").desc(nulls_first=True),
+            "-created_at",
+        ]
 
     def __str__(self):
         return f"{self.qualification} — {self.institution}"
+
+    @property
+    def is_expected(self):
+        return self.end_date is not None and self.end_date > timezone.localdate()
 
 
 class Experience(models.Model):

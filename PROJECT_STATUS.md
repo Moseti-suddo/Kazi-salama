@@ -13,7 +13,7 @@ Core demo flow built: profile entries, confirmation, advert screening, skill mat
 - Migrations 0001–0005 applied
 - Login, logout and password URLs; login template
 - CareerProfile page at `/profile/`
-- Education list, create and confirm toggle at `/profile/education/`
+- Education list, create and confirm toggle at `/profile/education/` (edit and remove added in Feature 3)
 - Shared layout `templates/base.html`: sidebar navigation, cream/sage/green/coral palette, Instrument Serif headings, Inter body text
 - Dashboard at `/` with per-section counts and unconfirmed badges
 - Skills page at `/profile/skills/`
@@ -50,6 +50,19 @@ Core demo flow built: profile entries, confirmation, advert screening, skill mat
   - No migration needed: `makemigrations --check --dry-run` reports `No changes detected` (seen 2026-11-23)
   - `python manage.py test -v 2`: 32 tests pass (10 accounts + 22 profiles), output seen 2026-11-23
   - Browser check reported working by the user (all 13 checks): field order and help text, full-name/phone/URL errors, email and name errors shown together, save message, `https://` added, lowercase email, no resubmit on refresh, confirm toggle, edit resets confirmation with warning, unchanged save keeps confirmation, dark-mode message, duplicate email from a second account, confirm refused without a name
+  - Committed as `2a7a19e` (2026-11-23)
+- Feature 3 (education), 2026-11-23:
+  - `profiles/models.py`: `Education.Meta.ordering` is now explicit: end date newest first with blank end dates first, then start date the same way, then `-created_at` as a stable tie-breaker. New `is_expected` property (end date after `timezone.localdate()`), computed when the page is shown, so it is not a database column
+  - `profiles/migrations/0008_education_ordering.py`: `AlterModelOptions` only. `sqlmigrate profiles 0008` prints `-- (no-op)`, so the database is unchanged. Applied.
+  - `profiles/forms.py`: `EducationForm` labels "End date or expected completion" and "Coursework or description", help text, `DateInput(format="%Y-%m-%d")` so saved dates appear on the edit page, 4-row textarea, `clean()` rejects an end date before the start date (error on `end_date`; equal dates allowed)
+  - `profiles/views.py`: new `education_edit` (own entries only; a changed value resets `is_confirmed`, with a warning if the entry was confirmed) and `education_delete` (POST only, own entries only); messages on add, edit, remove, confirm and unconfirm
+  - `profiles/urls.py`: `/profile/education/<pk>/edit/` (`education_edit`) and `/profile/education/<pk>/delete/` (`education_delete`)
+  - `templates/profiles/education_list.html`: date line ("Sep 2021 – Expected Jul 2027"), Edit link, Remove button with a browser confirm prompt, fields rendered with `as_field_group`
+  - `templates/profiles/education_edit.html`: new edit page
+  - `profiles/tests.py`: 20 new `EducationPageTests`
+  - `makemigrations --check --dry-run` reports `No changes detected` (seen 2026-11-23)
+  - `python manage.py test -v 2`: 52 tests pass (10 accounts + 42 profiles), output seen 2026-11-23
+  - Browser check (16 checks) reported done by the user: field order, labels and help text, required-field and date errors, add message, no resubmit on refresh, Expected label, ordering, confirm/unconfirm, saved dates in edit form, unchanged save keeps confirmation, changed save resets it with a warning, edit error then cancel, remove cancel and OK, dark mode, 404 for an unknown entry
 
 ## Code provided, not yet verified
 
@@ -81,7 +94,8 @@ Checked the documentation against the code:
 - `SECRET_KEY` is committed in `settings.py`. Acceptable for local development only. Move to an environment variable before sharing or deploying.
 - Skills can be duplicated; no uniqueness rule
 - Skill categories limited to five fixed choices
-- No date validation on Education, Experience or Project (end before start, current plus end date)
+- No date validation on Experience or Project (end before start, current plus end date). Education has it since Feature 3; reuse that `clean()` rule as a shared helper in Feature 4.
+- Resume (Feature 12): it shows only the education end-date year and does not mark expected completion dates
 - Every skill is "Claimed"; SkillEvidence does not exist yet
 - Resume (Feature 12): it uses personal details even when `profile_confirmed` is False, and prints an empty heading if the full name is blank (possible because `get_profile()` creates profiles with a blank name)
 - Scam rule weights and thresholds are starting values. They have not been validated against real adverts.
@@ -89,7 +103,7 @@ Checked the documentation against the code:
 - LLM extraction is not built. The rule engine and fixed skill list do all the work.
 - Resume generation is built although earlier documents listed CV generation as deferred. See DECISIONS.md.
 - No Projects, Certifications or Achievements pages (dashboard shows "Coming soon")
-- No edit or remove for Education, Experience, Skills and the other entry types (personal details have edit; no remove, by decision)
+- No edit or remove for Experience, Skills and the other entry types (Education has both since Feature 3; personal details have edit, and no remove by decision)
 - No status history, notes, next action or reminder date on adverts (only current status and deadline)
 - No wizard, Save Draft or Review and Confirm screen
 
@@ -101,12 +115,12 @@ None. PostgreSQL must be active for Django database commands.
 
 Working one feature at a time, end to end (model → views → tests → browser check → docs → commit).
 
-Feature order: 0 Foundation (done) → 1 Accounts (done) → 2 Personal details (done) → 3 Education → 4 Experience → 5 Projects → 6 Skills → 7 Certifications and Achievements → 8 Wizard and Review → 9 Advert screening → 10 Matching → 11 Tracker → 12 Resume
+Feature order: 0 Foundation (done) → 1 Accounts (done) → 2 Personal details (done) → 3 Education (done) → 4 Experience → 5 Projects → 6 Skills → 7 Certifications and Achievements → 8 Wizard and Review → 9 Advert screening → 10 Matching → 11 Tracker → 12 Resume
 
-Features 0 and 1 were committed (`0e732e7`). Commit Feature 2 next (the files listed above plus the three docs; leave out `notes.txt`).
+Features 0 and 1 were committed as `0e732e7` and Feature 2 as `2a7a19e`. Feature 3 is committed next (the files listed above plus the three docs; leave out `notes.txt`).
 
-Next: Feature 3, Education. Step 1 is a read-only review of the `Education` model, `EducationForm` and `/profile/education/` against PROJECT_CONTEXT.md section 4: required fields, date validation (end before start), and the missing edit and remove views. Edit must follow the "a saved change makes an entry unconfirmed" rule in DECISIONS.md. Then add tests and do a browser check.
+Next: Feature 4, Experience. Step 1 is a read-only review of the `Experience` model, `ExperienceForm` and `/profile/experience/` against PROJECT_CONTEXT.md section 4. Look at: date validation (end before start, and "present" (`is_current`) together with an end date), pulling the Education date rule out into a shared helper, edit and remove views following the Feature 3 pattern and the reset-on-change rule, ordering of current roles, messages, and tests. The experience page was never verified in the browser.
 
 ## Panel explanation
 
-The career profile is one record per Django user, with related entry tables in PostgreSQL. Each entry has an `is_confirmed` flag, and the system enforces its central rule: only confirmed entries are used for matching and document generation. A pasted advert is screened by plain Python rules that produce a Low, Medium or High scam-risk result with the indicators that fired. The result is a warning, not proof of fraud. High-risk adverts skip matching unless the user explicitly overrides. Otherwise the advert is compared with the user's confirmed skills to give matched skills, missing skills and a score. The user tracks the application status manually, and the system never submits anything. A tailored resume can be generated from confirmed entries only. Not built yet: LLM extraction, the guided wizard, edit/remove, status history, and SkillEvidence.
+The career profile is one record per Django user, with related entry tables in PostgreSQL. Each entry has an `is_confirmed` flag, and the system enforces its central rule: only confirmed entries are used for matching and document generation. A pasted advert is screened by plain Python rules that produce a Low, Medium or High scam-risk result with the indicators that fired. The result is a warning, not proof of fraud. High-risk adverts skip matching unless the user explicitly overrides. Otherwise the advert is compared with the user's confirmed skills to give matched skills, missing skills and a score. The user tracks the application status manually, and the system never submits anything. A tailored resume can be generated from confirmed entries only. Not built yet: LLM extraction, the guided wizard, edit/remove for most entry types (Education has them), status history, and SkillEvidence.

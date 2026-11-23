@@ -56,6 +56,8 @@ During the rush before the presentation the user asked for fast, multi-step code
 
 Built so far: step 1, steps 4 (for personal details, Education, Experience, Skills), 5 (pasted text only), 6, 7, 8, 9, 10 (matched and missing only), 11 (score and explanation, no supporting evidence), 12, 13, and part of 14 (status and deadline).
 
+Edit and remove exist for personal details (edit only) and Education.
+
 Not built: wizard, Save Draft, review screen, URL submission, partial matches, supporting evidence, notes form, next action, reminder date, status history.
 
 ## 4. Career Profile Sections
@@ -302,14 +304,14 @@ Profiles app files:
 - `profiles/models.py`, `forms.py`, `views.py`, `urls.py`, `admin.py`
 - `profiles/scam.py` (scam rules)
 - `profiles/matching.py` (skill matching)
-- `profiles/tests.py` (22 tests: 5 scam/matching, 17 profile page)
-- `profiles/migrations/0001` to `0007`
+- `profiles/tests.py` (42 tests: 5 scam/matching, 17 profile page, 20 education page)
+- `profiles/migrations/0001` to `0008` (0008 changes Education ordering only and runs no SQL)
 
 Templates (Django searches both folders: `DIRS` and `APP_DIRS`):
 
 - `templates/base.html`
 - `templates/registration/login.html`
-- `templates/profiles/profile_edit.html`, `dashboard.html`, `education_list.html`, `skill_list.html`, `experience_list.html`
+- `templates/profiles/profile_edit.html`, `dashboard.html`, `education_list.html`, `education_edit.html`, `skill_list.html`, `experience_list.html`
 - `templates/profiles/advert_list.html`, `advert_detail.html`, `resume.html`
 - All templates now live under `templates/`. `profile_edit.html` was moved there from `profiles/templates/profiles/` in Feature 2.
 - `base.html` shows Django messages (success, info, warning, error) above every page's content.
@@ -395,6 +397,8 @@ Working browser routes:
 - `/profile/` — create and edit personal details (CareerProfile plus account email)
 - `/profile/confirm/` — POST, confirm or unconfirm personal details
 - `/profile/education/` — list, add and confirm education
+- `/profile/education/<id>/edit/` — edit an education entry (a change makes it unconfirmed)
+- `/profile/education/<id>/delete/` — POST, remove an education entry
 - `/profile/skills/` — list, add and confirm skills
 - `/profile/experience/` — list, add and confirm experience
 - `/adverts/` — list adverts and screen a new one

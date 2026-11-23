@@ -47,14 +47,28 @@ class EducationForm(forms.ModelForm):
             "end_date",
             "description",
         ]
-        widgets = {
-            "start_date": forms.DateInput(
-                attrs={"type": "date"}
-            ),
-            "end_date": forms.DateInput(
-                attrs={"type": "date"}
-            ),
+        labels = {
+            "end_date": "End date or expected completion",
+            "description": "Coursework or description",
         }
+        help_texts = {
+            "start_date": "Optional.",
+            "end_date": "Optional. Still studying? Enter your expected completion date.",
+            "description": "Optional. e.g. relevant units, final-year project, honours.",
+        }
+        widgets = {
+            "start_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "end_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "description": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get("start_date")
+        end = cleaned_data.get("end_date")
+        if start and end and end < start:
+            self.add_error("end_date", "End date cannot be before the start date.")
+        return cleaned_data
 
 class SkillForm(forms.ModelForm):
     class Meta:

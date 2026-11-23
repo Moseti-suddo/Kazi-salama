@@ -93,6 +93,7 @@ def education_list(request):
             education = form.save(commit=False)
             education.profile = profile
             education.save()
+            messages.success(request, "Education added.")
             return redirect("education_list")
     else:
         form = EducationForm()
@@ -110,6 +111,50 @@ def education_confirm(request, pk):
     entry = get_object_or_404(Education, pk=pk, profile__user=request.user)
     entry.is_confirmed = not entry.is_confirmed
     entry.save(update_fields=["is_confirmed", "updated_at"])
+    if entry.is_confirmed:
+        messages.success(request, "Education entry confirmed.")
+    else:
+        messages.info(request, "Education entry marked unconfirmed.")
+    return redirect("education_list")
+
+
+@login_required
+def education_edit(request, pk):
+    entry = get_object_or_404(Education, pk=pk, profile__user=request.user)
+    was_confirmed = entry.is_confirmed
+
+    if request.method == "POST":
+        form = EducationForm(request.POST, instance=entry)
+        if form.is_valid():
+            changed = form.has_changed()
+            entry = form.save(commit=False)
+            if changed:
+                entry.is_confirmed = False
+            entry.save()
+            if changed and was_confirmed:
+                messages.warning(
+                    request,
+                    "Education updated. It changed, so please confirm it again.",
+                )
+            else:
+                messages.success(request, "Education updated.")
+            return redirect("education_list")
+    else:
+        form = EducationForm(instance=entry)
+
+    return render(
+        request,
+        "profiles/education_edit.html",
+        {"form": form, "entry": entry},
+    )
+
+
+@login_required
+@require_POST
+def education_delete(request, pk):
+    entry = get_object_or_404(Education, pk=pk, profile__user=request.user)
+    entry.delete()
+    messages.success(request, "Education entry removed.")
     return redirect("education_list")
 
 

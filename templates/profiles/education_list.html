@@ -4,6 +4,7 @@
 
 {% block content %}
 <h1>Education</h1>
+<p class="lead">Only confirmed entries are used for matching and your resume. Any saved change marks an entry unconfirmed until you confirm it again.</p>
 
 <ul>
     {% for education in education_entries %}
@@ -11,6 +12,13 @@
             <div>
                 <strong>{{ education.qualification }}</strong> · {{ education.field_of_study }}<br>
                 <span class="muted">{{ education.institution }}</span>
+                {% if education.start_date or education.end_date %}
+                    <br><span class="muted">
+                        {% if education.start_date %}{{ education.start_date|date:"M Y" }}{% endif %}
+                        {% if education.start_date and education.end_date %} – {% endif %}
+                        {% if education.end_date %}{% if education.is_expected %}Expected {% endif %}{{ education.end_date|date:"M Y" }}{% endif %}
+                    </span>
+                {% endif %}
             </div>
             <div class="entry-actions">
                 {% if education.is_confirmed %}
@@ -24,6 +32,11 @@
                         {% if education.is_confirmed %}Unconfirm{% else %}Confirm{% endif %}
                     </button>
                 </form>
+                <a href="{% url 'education_edit' education.pk %}">Edit</a>
+                <form method="post" action="{% url 'education_delete' education.pk %}" onsubmit="return confirm('Remove this education entry?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-small">Remove</button>
+                </form>
             </div>
         </li>
     {% empty %}
@@ -35,7 +48,10 @@
 
 <form method="post">
     {% csrf_token %}
-    {{ form.as_p }}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+        <div class="field">{{ field.as_field_group }}</div>
+    {% endfor %}
     <button type="submit">Save education</button>
 </form>
 {% endblock %}

@@ -1,8 +1,11 @@
+from datetime import date, timedelta
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
-from .models import CareerProfile
+from .models import CareerProfile, Education
 from .matching import match_skills
 from .scam import screen_advert
 
@@ -193,3 +196,201 @@ class ProfilePageTests(TestCase):
         other_profile.refresh_from_db()
         self.assertFalse(other_profile.profile_confirmed)
         self.assertTrue(self.profile().profile_confirmed)
+
+   
+class EducationPageTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("amina", "amina@example.com", PASSWORD)
+        self.client.force_login(self.user)
+        self.profile = CareerProfile.objects.create(user=self.user, full_name="Amina Otieno")
+        self.url = reverse("education_list")
+
+    def valid_data(self, **overrides):
+        data = {
+            "institution": "University of Nairobi",
+            "qualification": "BSc",
+            "field_of_study": "Computer Science",
+            "start_date": "2021-09-01",
+            "end_date": "2025-07-31",
+            "description": "Final-year project: job-scam detector.",
+        }
+        data.update(overrides)
+        return data
+
+    def make_entry(self, profile=None, **overrides):
+        fields = {
+            "institution": "University of Nairobi",
+            "qualification": "BSc",
+            "field_of_study": "Computer Science",
+            "start_date": date(2021, 9, 1),
+            "end_date": date(2025, 7, 31),
+            "description": "Final-year project: job-scam detector.",
+        }
+        fields.update(overrides)
+        return Education.objects.create(profile=profile or self.profile, **fields)
+
+    def other_entry(self):
+        other = User.objects.create_user("bob", "bob@example.com", PASSWORD)
+        other_profile = CareerProfile.objects.create(user=other, full_name="Bob")
+        return self.make_entry(profile=other_profile, qualification="Diploma")
+
+    # --- access and adding ---
+
+    def test_login_required(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertRedirects(response, f"{reverse('login')}?next={self.url}")
+
+    def test_add_entry(self):
+        response = self.client.post(self.url, self.valid_data())
+        self.assertRedirects(response, self.url)
+        entry = Education.objects.get()
+        self.assertEqual(entry.profile, self.profile)
+        self.assertEqual(entry.end_date, date(2025, 7, 31))
+        self.assertFalse(entry.is_confirmed)
+
+    def test_required_fields(self):
+        for field in ["institution", "qualification", "field_of_study"]:
+            with self.subTest(field=field):
+                response = self.client.post(self.url, self.valid_data(**{field: ""}))
+                self.assertEqual(response.status_code, 200)
+                self.assertFormError(response.context["form"], field, "This field is required.")
+        self.assertEqual(Education.objects.count(), 0)
+
+    def test_dates_optional(self):
+        self.client.post(self.url, self.valid_data(start_date="", end_date=""))
+        entry = Education.objects.get()
+        self.assertIsNone(entry.start_date)
+        self.assertIsNone(entry.end_date)
+
+    # --- date rule ---
+
+    def test_end_before_start_rejected(self):
+        response = self.client.post(
+            self.url, self.valid_data(start_date="2025-09-01", end_date="2021-07-31")
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"], "end_date", "End date cannot be before the start date."
+        )
+        self.assertEqual(Education.objects.count(), 0)
+
+    def test_equal_dates_allowed(self):
+        self.client.post(self.url, self.valid_data(start_date="2024-01-15", end_date="2024-01-15"))
+        self.assertEqual(Education.objects.count(), 1)
+
+    def test_future_end_date_shown_as_expected(self):
+        future = timezone.localdate() + timedelta(days=365)
+        self.make_entry(end_date=future)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Expected")
+
+    def test_past_end_date_not_shown_as_expected(self):
+        self.make_entry()
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "Expected ")
+
+    # --- edit ---
+
+    def test_edit_page_shows_saved_dates(self):
+        entry = self.make_entry()
+        response = self.client.get(reverse("education_edit", args=[entry.pk]))
+        self.assertContains(response, 'value="2021-09-01"')
+        self.assertContains(response, 'value="2025-07-31"')
+
+    def test_edit_saves_changes(self):
+        entry = self.make_entry()
+        response = self.client.post(
+            reverse("education_edit", args=[entry.pk]),
+            self.valid_data(qualification="BSc (Hons)"),
+        )
+        self.assertRedirects(response, self.url)
+        entry.refresh_from_db()
+        self.assertEqual(entry.qualification, "BSc (Hons)")
+
+    def test_edit_resets_confirmation(self):
+        entry = self.make_entry(is_confirmed=True)
+        response = self.client.post(
+            reverse("education_edit", args=[entry.pk]),
+            self.valid_data(qualification="BSc (Hons)"),
+            follow=True,
+        )
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_confirmed)
+        self.assertContains(response, "please confirm it again")
+
+    def test_unchanged_save_keeps_confirmation(self):
+        entry = self.make_entry(is_confirmed=True)
+        self.client.post(reverse("education_edit", args=[entry.pk]), self.valid_data())
+        entry.refresh_from_db()
+        self.assertTrue(entry.is_confirmed)
+
+    def test_edit_rejects_end_before_start(self):
+        entry = self.make_entry()
+        response = self.client.post(
+            reverse("education_edit", args=[entry.pk]),
+            self.valid_data(end_date="2020-01-01"),
+        )
+        self.assertFormError(
+            response.context["form"], "end_date", "End date cannot be before the start date."
+        )
+        entry.refresh_from_db()
+        self.assertEqual(entry.end_date, date(2025, 7, 31))
+
+    def test_cannot_edit_other_users_entry(self):
+        entry = self.other_entry()
+        url = reverse("education_edit", args=[entry.pk])
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.client.post(url, self.valid_data()).status_code, 404)
+        entry.refresh_from_db()
+        self.assertEqual(entry.qualification, "Diploma")
+
+    # --- remove ---
+
+    def test_delete_requires_post(self):
+        entry = self.make_entry()
+        response = self.client.get(reverse("education_delete", args=[entry.pk]))
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(Education.objects.filter(pk=entry.pk).exists())
+
+    def test_delete_own_entry(self):
+        entry = self.make_entry()
+        response = self.client.post(reverse("education_delete", args=[entry.pk]))
+        self.assertRedirects(response, self.url)
+        self.assertFalse(Education.objects.filter(pk=entry.pk).exists())
+
+    def test_cannot_delete_other_users_entry(self):
+        entry = self.other_entry()
+        response = self.client.post(reverse("education_delete", args=[entry.pk]))
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Education.objects.filter(pk=entry.pk).exists())
+
+    # --- confirm ---
+
+    def test_confirm_toggles(self):
+        entry = self.make_entry()
+        url = reverse("education_confirm", args=[entry.pk])
+        self.client.post(url)
+        entry.refresh_from_db()
+        self.assertTrue(entry.is_confirmed)
+        self.client.post(url)
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_confirmed)
+
+    def test_cannot_confirm_other_users_entry(self):
+        entry = self.other_entry()
+        response = self.client.post(reverse("education_confirm", args=[entry.pk]))
+        self.assertEqual(response.status_code, 404)
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_confirmed)
+
+    # --- ordering ---
+
+    def test_ordering(self):
+        older = self.make_entry(end_date=date(2020, 7, 1))
+        newer = self.make_entry(end_date=date(2024, 7, 1))
+        no_dates = self.make_entry(start_date=None, end_date=None)
+        self.assertEqual(
+            list(Education.objects.filter(profile=self.profile)),
+            [no_dates, newer, older],
+        )

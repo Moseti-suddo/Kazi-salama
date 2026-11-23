@@ -2,6 +2,8 @@ from django.urls import path
 from .views import (
     dashboard,
     education_confirm,
+    education_delete,
+    education_edit,
     education_list,
     profile_edit,
     skill_confirm,
@@ -33,4 +35,6 @@ urlpatterns = [
     path("adverts/<int:pk>/status/", advert_status, name="advert_status"),
     path("adverts/<int:pk>/delete/", advert_delete, name="advert_delete"),
     path("adverts/<int:pk>/resume/", advert_resume, name="advert_resume"),
+    path("profile/education/<int:pk>/edit/", education_edit, name="education_edit"),
+    path("profile/education/<int:pk>/delete/", education_delete, name="education_delete"),
 ]
