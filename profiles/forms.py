@@ -1,5 +1,7 @@
+import re
 from django import forms
 from .models import Advert, CareerProfile, Education, Experience, Skill
+
 class CareerProfileForm(forms.ModelForm):
     class Meta:
         model = CareerProfile
@@ -10,11 +12,28 @@ class CareerProfileForm(forms.ModelForm):
             "professional_summary",
             "portfolio_url",
         ]
+        labels = {
+            "portfolio_url": "Portfolio or LinkedIn link",
+        }
+        help_texts = {
+            "phone_number": "Optional. Digits, spaces, +, - and brackets, e.g. +254 712 345 678.",
+            "portfolio_url": "Optional. e.g. https://linkedin.com/in/your-name",
+        }
         widgets = {
             "professional_summary": forms.Textarea(
                 attrs={"rows": 5}
             ),
         }
+
+    def clean_phone_number(self):
+        phone = self.cleaned_data["phone_number"]
+        if not phone:
+            return phone
+        if not re.fullmatch(r"[0-9+()\- ]+", phone):
+            raise forms.ValidationError("Use only digits, spaces, +, - and brackets.")
+        if sum(ch.isdigit() for ch in phone) < 7:
+            raise forms.ValidationError("Enter at least 7 digits.")
+        return phone
 
 
 class EducationForm(forms.ModelForm):

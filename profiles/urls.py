@@ -14,11 +14,13 @@ from .views import (
     advert_status,
     advert_delete,
     advert_resume,
+    profile_confirm,
 )
 
 urlpatterns = [
     path("", dashboard, name="dashboard"),
     path("profile/", profile_edit, name="profile_edit"),
+    path("profile/confirm/", profile_confirm, name="profile_confirm"),
     path("profile/education/", education_list, name="education_list"),
     path("profile/education/<int:pk>/confirm/", education_confirm, name="education_confirm"),
     path("profile/skills/", skill_list, name="skill_list"),

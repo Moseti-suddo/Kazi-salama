@@ -54,7 +54,7 @@ During the rush before the presentation the user asked for fast, multi-step code
 13. Track the application externally.
 14. Record status, deadlines, notes and next actions.
 
-Built so far: step 1, steps 4 (for Education, Experience, Skills), 5 (pasted text only), 6, 7, 8, 9, 10 (matched and missing only), 11 (score and explanation, no supporting evidence), 12, 13, and part of 14 (status and deadline).
+Built so far: step 1, steps 4 (for personal details, Education, Experience, Skills), 5 (pasted text only), 6, 7, 8, 9, 10 (matched and missing only), 11 (score and explanation, no supporting evidence), 12, 13, and part of 14 (status and deadline).
 
 Not built: wizard, Save Draft, review screen, URL submission, partial matches, supporting evidence, notes form, next action, reminder date, status history.
 
@@ -294,7 +294,7 @@ Django files:
 
 Accounts app files:
 
-- `accounts/forms.py` (`RegisterForm`), `views.py` (`register`), `urls.py`, `tests.py` (10 tests)
+- `accounts/forms.py` (`clean_unique_email`, `RegisterForm`, `AccountEmailForm`), `views.py` (`register`), `urls.py`, `tests.py` (10 tests)
 - `templates/registration/register.html`
 
 Profiles app files:
@@ -302,16 +302,17 @@ Profiles app files:
 - `profiles/models.py`, `forms.py`, `views.py`, `urls.py`, `admin.py`
 - `profiles/scam.py` (scam rules)
 - `profiles/matching.py` (skill matching)
-- `profiles/tests.py` (5 tests)
+- `profiles/tests.py` (22 tests: 5 scam/matching, 17 profile page)
 - `profiles/migrations/0001` to `0007`
 
 Templates (Django searches both folders: `DIRS` and `APP_DIRS`):
 
 - `templates/base.html`
 - `templates/registration/login.html`
-- `templates/profiles/dashboard.html`, `education_list.html`, `skill_list.html`, `experience_list.html`
+- `templates/profiles/profile_edit.html`, `dashboard.html`, `education_list.html`, `skill_list.html`, `experience_list.html`
 - `templates/profiles/advert_list.html`, `advert_detail.html`, `resume.html`
-- `profiles/templates/profiles/profile_edit.html` (the only copy; used by `/profile/`)
+- All templates now live under `templates/`. `profile_edit.html` was moved there from `profiles/templates/profiles/` in Feature 2.
+- `base.html` shows Django messages (success, info, warning, error) above every page's content.
 
 Django settings currently configure:
 
@@ -373,7 +374,7 @@ CareerProfile contains:
 - Whole-profile confirmation state
 - Creation and update timestamps
 
-Email is not a CareerProfile field. The resume reads the Django user's email.
+Email is not a CareerProfile field. It stays on the Django user, is edited on `/profile/` (required, lowercased, unique ignoring case), and is what the resume reads.
 
 Database tables:
 
@@ -391,7 +392,8 @@ Working browser routes:
 - `/accounts/register/` — create an account (signed in automatically, then `/profile/`)
 - `/accounts/login/` — sign in
 - `/` — dashboard
-- `/profile/` — create and edit CareerProfile
+- `/profile/` — create and edit personal details (CareerProfile plus account email)
+- `/profile/confirm/` — POST, confirm or unconfirm personal details
 - `/profile/education/` — list, add and confirm education
 - `/profile/skills/` — list, add and confirm skills
 - `/profile/experience/` — list, add and confirm experience

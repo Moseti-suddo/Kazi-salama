@@ -1,6 +1,10 @@
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
+
+from accounts.forms import AccountEmailForm
 
 from .forms import (
     AdvertForm,
@@ -25,16 +29,57 @@ def get_profile(user):
 @login_required
 def profile_edit(request):
     profile = get_profile(request.user)
+    was_confirmed = profile.profile_confirmed
+    old_email = request.user.email
 
     if request.method == "POST":
         form = CareerProfileForm(request.POST, instance=profile)
-        if form.is_valid():
-            form.save()
+        email_form = AccountEmailForm(request.POST, instance=request.user)
+        profile_ok = form.is_valid()
+        email_ok = email_form.is_valid()
+        if profile_ok and email_ok:
+            changed = (
+                form.has_changed()
+                or email_form.cleaned_data["email"] != old_email
+            )
+            with transaction.atomic():
+                profile = form.save(commit=False)
+                if changed:
+                    profile.profile_confirmed = False
+                profile.save()
+                email_form.save()
+            if changed and was_confirmed:
+                messages.warning(
+                    request,
+                    "Profile saved. Your details changed, so please confirm them again.",
+                )
+            else:
+                messages.success(request, "Profile saved.")
             return redirect("profile_edit")
     else:
         form = CareerProfileForm(instance=profile)
+        email_form = AccountEmailForm(instance=request.user)
 
-    return render(request, "profiles/profile_edit.html", {"form": form})
+    return render(
+        request,
+        "profiles/profile_edit.html",
+        {"form": form, "email_form": email_form, "profile": profile},
+    )
+
+
+@login_required
+@require_POST
+def profile_confirm(request):
+    profile = get_profile(request.user)
+    if not profile.profile_confirmed and not (profile.full_name and request.user.email):
+        messages.error(
+            request,
+            "Add your full name and email before confirming your details.",
+        )
+        return redirect("profile_edit")
+    profile.profile_confirmed = not profile.profile_confirmed
+    profile.save(update_fields=["profile_confirmed", "updated_at"])
+    return redirect("profile_edit")
 
 
 @login_required

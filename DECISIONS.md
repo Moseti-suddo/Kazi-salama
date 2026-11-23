@@ -30,7 +30,7 @@ Registration lives in a separate `accounts` app, not in `profiles`. Identity and
 
 Django's built-in `User` and `UserCreationForm` are used. A custom user model was rejected because replacing `User` this late is a large, risky migration. `django-allauth` was rejected as an unnecessary dependency.
 
-Email is required at registration and must be unique, ignoring case. Uniqueness is enforced in `RegisterForm`, not the database, because the built-in `User.email` column is not unique. Users created through Django Admin bypass this check.
+Email is required at registration and must be unique, ignoring case. Uniqueness is enforced in forms (`clean_unique_email()` in `accounts/forms.py`, used by `RegisterForm` and `AccountEmailForm`), not the database, because the built-in `User.email` column is not unique. Users created through Django Admin bypass this check.
 
 New users are signed in immediately after registering. There is no email verification because the MVP sends no email.
 
@@ -40,9 +40,23 @@ Profile information will be entered through forms and a guided wizard. The wizar
 
 CV upload will come later. It may extract suggested details, but it must not silently confirm or add them to the profile.
 
+## Personal details (Feature 2, 2026-11-23)
+
+Email stays on Django's `User` and is edited on the profile page through `AccountEmailForm`, rendered with `CareerProfileForm` in one form with one Save button. Both forms must be valid before either is saved, and they are saved in one transaction. An `email` field on `CareerProfile` was rejected because two copies would drift apart, and the resume and the duplicate-email rule already use `User.email`.
+
+Full name is required by the form. The database can still hold a blank name, because `get_profile()` creates profiles lazily with `user.get_full_name()`, which is empty after registration. Lazy creation is kept because it also covers Admin-created and older users. A `post_save` signal and creating the profile only at registration were rejected.
+
+Phone number gets a light form check (digits, spaces, `+`, `-`, brackets, at least 7 digits). `django-phonenumber-field` was rejected as an extra dependency for an optional field.
+
+Labels and help text are set in the form, not the model, so no migration was needed.
+
+Personal details have no Remove action. Deleting `CareerProfile` would cascade and delete every profile entry and advert. Users can clear the optional fields instead.
+
 ## Confirmation
 
-Every profile entry must be reviewed and confirmed individually.
+Every profile entry must be reviewed and confirmed individually. Personal details count as one entry, confirmed with the `profile_confirmed` flag (toggled at `/profile/confirm/`). Personal details can only be confirmed once full name and email are filled in.
+
+A saved edit that changes any value makes the entry unconfirmed again, so "confirmed" always means the user reviewed the current content. Saving without changes keeps it confirmed. This applies to personal details now and to every entry type when its edit view is added (Features 3–7). Keeping confirmation after an edit was rejected because a wrong change would still count as confirmed.
 
 Unconfirmed facts are excluded from matching and generated documents. This is enforced in the matching view and the resume view, which both filter on `is_confirmed=True`.
 

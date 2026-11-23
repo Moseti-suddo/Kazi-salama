@@ -1,6 +1,6 @@
 # Kazi Salama — Project Status
 
-Last updated: 2026-11-21
+Last updated: 2026-11-23
 
 ## Current phase
 
@@ -39,6 +39,17 @@ Core demo flow built: profile entries, confirmation, advert screening, skill mat
   - `accounts/tests.py`: 10 tests (register, email required, duplicate email, hashed password, login, wrong password, logout, `login_required` redirect with `?next=`)
   - `python manage.py test -v 2`: 15 tests pass (10 accounts + 5 profiles)
   - Browser check reported working by the user: register errors, duplicate email, register then sign-in, sign out, `?next=` return after login
+- Feature 2 (personal details), 2026-11-23:
+  - `accounts/forms.py`: shared `clean_unique_email()`; new `AccountEmailForm` edits `User.email` (required, lowercased, unique ignoring case, own address allowed). `RegisterForm` now uses the shared function.
+  - `profiles/forms.py`: `CareerProfileForm` label "Portfolio or LinkedIn link", help text, `clean_phone_number` (digits, spaces, `+`, `-`, brackets, at least 7 digits)
+  - `profiles/views.py`: `profile_edit` validates both forms, saves them in one transaction, resets `profile_confirmed` when a value changed, shows success or warning messages; new `profile_confirm` (POST only, refuses to confirm without full name and email)
+  - `profiles/urls.py`: `/profile/confirm/` (name `profile_confirm`)
+  - `templates/profiles/profile_edit.html` (moved from `profiles/templates/profiles/` with `git mv`): fields in spec order with email second, confirmed badge and Confirm/Unconfirm button
+  - `templates/base.html`: messages block and `.msg-success`, `.msg-info`, `.msg-warning`, `.field` styles
+  - `profiles/tests.py`: 17 new `ProfilePageTests`
+  - No migration needed: `makemigrations --check --dry-run` reports `No changes detected` (seen 2026-11-23)
+  - `python manage.py test -v 2`: 32 tests pass (10 accounts + 22 profiles), output seen 2026-11-23
+  - Browser check reported working by the user (all 13 checks): field order and help text, full-name/phone/URL errors, email and name errors shown together, save message, `https://` added, lowercase email, no resubmit on refresh, confirm toggle, edit resets confirmation with warning, unchanged save keeps confirmation, dark-mode message, duplicate email from a second account, confirm refused without a name
 
 ## Code provided, not yet verified
 
@@ -66,20 +77,19 @@ Checked the documentation against the code:
 ## Known issues
 
 - Always run `source .venv/bin/activate` first. The system Python has Django 5.2.17, which created the faulty migration 0006. Check that the prompt shows `(.venv)`.
-- Templates are split across two folders: `profile_edit.html` lives in `profiles/templates/profiles/`, all others in `templates/profiles/`. Both are found by Django (`DIRS` plus `APP_DIRS`). Optional: move `profile_edit.html` into `templates/profiles/` for consistency.
-- `MAILERS` in `settings.py` is not a Django setting. The real one is `EMAIL_BACKEND`. Only matters once password-reset email is used.
+- `MAILERS` in `settings.py`: earlier notes called it "not a Django setting", but the comment above it links to the Django 6.1 email docs and the venv runs 6.1.3, so it may be the real 6.1 setting. Not verified yet. Check before changing it, when password-reset email comes up.
 - `SECRET_KEY` is committed in `settings.py`. Acceptable for local development only. Move to an environment variable before sharing or deploying.
 - Skills can be duplicated; no uniqueness rule
 - Skill categories limited to five fixed choices
 - No date validation on Education, Experience or Project (end before start, current plus end date)
 - Every skill is "Claimed"; SkillEvidence does not exist yet
-- Email is required in `PROJECT_CONTEXT.md` but is not a CareerProfile field. The resume reads the Django user's email.
+- Resume (Feature 12): it uses personal details even when `profile_confirmed` is False, and prints an empty heading if the full name is blank (possible because `get_profile()` creates profiles with a blank name)
 - Scam rule weights and thresholds are starting values. They have not been validated against real adverts.
 - Matching only recognises the fixed `KNOWN_SKILLS` list plus the user's confirmed skills. Unusual skills in an advert are missed. No partial-match category yet.
 - LLM extraction is not built. The rule engine and fixed skill list do all the work.
 - Resume generation is built although earlier documents listed CV generation as deferred. See DECISIONS.md.
 - No Projects, Certifications or Achievements pages (dashboard shows "Coming soon")
-- No edit or remove for profile entries
+- No edit or remove for Education, Experience, Skills and the other entry types (personal details have edit; no remove, by decision)
 - No status history, notes, next action or reminder date on adverts (only current status and deadline)
 - No wizard, Save Draft or Review and Confirm screen
 
@@ -91,11 +101,11 @@ None. PostgreSQL must be active for Django database commands.
 
 Working one feature at a time, end to end (model → views → tests → browser check → docs → commit).
 
-Feature order: 0 Foundation (done) → 1 Accounts (done) → 2 Personal details → 3 Education → 4 Experience → 5 Projects → 6 Skills → 7 Certifications and Achievements → 8 Wizard and Review → 9 Advert screening → 10 Matching → 11 Tracker → 12 Resume
+Feature order: 0 Foundation (done) → 1 Accounts (done) → 2 Personal details (done) → 3 Education → 4 Experience → 5 Projects → 6 Skills → 7 Certifications and Achievements → 8 Wizard and Review → 9 Advert screening → 10 Matching → 11 Tracker → 12 Resume
 
-Commit Feature 0 and Feature 1 at the end of the session (include `profiles/migrations/0007_*.py` and the new `accounts/` folder).
+Features 0 and 1 were committed (`0e732e7`). Commit Feature 2 next (the files listed above plus the three docs; leave out `notes.txt`).
 
-Next: Feature 2, Personal details (CareerProfile at `/profile/`): review fields against the spec (email, required full name, URL), add tests, verify in the browser
+Next: Feature 3, Education. Step 1 is a read-only review of the `Education` model, `EducationForm` and `/profile/education/` against PROJECT_CONTEXT.md section 4: required fields, date validation (end before start), and the missing edit and remove views. Edit must follow the "a saved change makes an entry unconfirmed" rule in DECISIONS.md. Then add tests and do a browser check.
 
 ## Panel explanation
 

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}My Profile | Kazi Salama{% endblock %}
+{% block content %}
+<div class="entry">
+    <h1>My Career Profile</h1>
+    <div class="entry-actions">
+        {% if profile.profile_confirmed %}
+            <span class="badge ok">Confirmed</span>
+        {% else %}
+            <span class="badge warn">Unconfirmed</span>
+        {% endif %}
+        <form method="post" action="{% url 'profile_confirm' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-small">
+                {% if profile.profile_confirmed %}Unconfirm{% else %}Confirm details{% endif %}
+            </button>
+        </form>
+    </div>
+</div>
+<p class="lead">Your personal details. Any saved change marks them unconfirmed until you confirm them again.</p>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="field">{{ form.full_name.as_field_group }}</div>
+    <div class="field">{{ email_form.email.as_field_group }}</div>
+    <div class="field">{{ form.phone_number.as_field_group }}</div>
+    <div class="field">{{ form.location.as_field_group }}</div>
+    <div class="field">{{ form.professional_summary.as_field_group }}</div>
+    <div class="field">{{ form.portfolio_url.as_field_group }}</div>
+    <button type="submit">Save profile</button>
+</form>
+{% endblock %}
