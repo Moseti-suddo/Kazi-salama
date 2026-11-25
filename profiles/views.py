@@ -11,10 +11,11 @@ from .forms import (
     CareerProfileForm,
     EducationForm,
     ExperienceForm,
+    ProjectForm,
     SkillForm,
 )
 from .matching import match_skills, _found
-from .models import Advert, CareerProfile, Education, Experience, Skill
+from .models import Advert, CareerProfile, Education, Experience, Project, Skill
 from .scam import screen_advert
 
 
@@ -164,11 +165,12 @@ def dashboard(request):
     sections = [
         ("Education", profile.education_entries, "education_list"),
         ("Experience", profile.experience_entries, "experience_list"),
-        ("Projects", profile.project_entries, None),
+        ("Projects", profile.project_entries, "project_list"),
         ("Skills", profile.skills, "skill_list"),
         ("Certifications", profile.certifications, None),
         ("Achievements", profile.achievements, None),
     ]
+    
     cards = []
     for name, manager, url_name in sections:
         total = manager.count()
@@ -298,6 +300,81 @@ def experience_delete(request, pk):
     entry.delete()
     messages.success(request, "Experience entry removed.")
     return redirect("experience_list")
+
+@login_required
+def project_list(request):
+    profile = get_profile(request.user)
+    entries = Project.objects.filter(profile=profile)
+
+    if request.method == "POST":
+        form = ProjectForm(request.POST)
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.profile = profile
+            entry.save()
+            messages.success(request, "Project added.")
+            return redirect("project_list")
+    else:
+        form = ProjectForm()
+
+    return render(
+        request,
+        "profiles/project_list.html",
+        {"entries": entries, "form": form},
+    )
+
+
+@login_required
+@require_POST
+def project_confirm(request, pk):
+    entry = get_object_or_404(Project, pk=pk, profile__user=request.user)
+    entry.is_confirmed = not entry.is_confirmed
+    entry.save(update_fields=["is_confirmed", "updated_at"])
+    if entry.is_confirmed:
+        messages.success(request, "Project confirmed.")
+    else:
+        messages.info(request, "Project marked unconfirmed.")
+    return redirect("project_list")
+
+
+@login_required
+def project_edit(request, pk):
+    entry = get_object_or_404(Project, pk=pk, profile__user=request.user)
+    was_confirmed = entry.is_confirmed
+
+    if request.method == "POST":
+        form = ProjectForm(request.POST, instance=entry)
+        if form.is_valid():
+            changed = form.has_changed()
+            entry = form.save(commit=False)
+            if changed:
+                entry.is_confirmed = False
+            entry.save()
+            if changed and was_confirmed:
+                messages.warning(
+                    request,
+                    "Project updated. It changed, so please confirm it again.",
+                )
+            else:
+                messages.success(request, "Project updated.")
+            return redirect("project_list")
+    else:
+        form = ProjectForm(instance=entry)
+
+    return render(
+        request,
+        "profiles/project_edit.html",
+        {"form": form, "entry": entry},
+    )
+
+
+@login_required
+@require_POST
+def project_delete(request, pk):
+    entry = get_object_or_404(Project, pk=pk, profile__user=request.user)
+    entry.delete()
+    messages.success(request, "Project removed.")
+    return redirect("project_list")
 
 
 def _run_match(advert):

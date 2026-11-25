@@ -54,9 +54,9 @@ During the rush before the presentation the user asked for fast, multi-step code
 13. Track the application externally.
 14. Record status, deadlines, notes and next actions.
 
-Built so far: step 1, steps 4 (for personal details, Education, Experience, Skills), 5 (pasted text only), 6, 7, 8, 9, 10 (matched and missing only), 11 (score and explanation, no supporting evidence), 12, 13, and part of 14 (status and deadline).
+Built so far: step 1, steps 4 (for personal details, Education, Experience, Projects, Skills), 5 (pasted text only), 6, 7, 8, 9, 10 (matched and missing only), 11 (score and explanation, no supporting evidence), 12, 13, and part of 14 (status and deadline).
 
-Edit and remove exist for personal details (edit only) and Education.
+Edit and remove exist for personal details (edit only), Education, Experience and Projects.
 
 Not built: wizard, Save Draft, review screen, URL submission, partial matches, supporting evidence, notes form, next action, reminder date, status history.
 
@@ -304,14 +304,14 @@ Profiles app files:
 - `profiles/models.py`, `forms.py`, `views.py`, `urls.py`, `admin.py`
 - `profiles/scam.py` (scam rules)
 - `profiles/matching.py` (skill matching)
-- `profiles/tests.py` (42 tests: 5 scam/matching, 17 profile page, 20 education page)
-- `profiles/migrations/0001` to `0009` (0008 and 0009 change Education and Experience ordering only and run no SQL)
+- `profiles/tests.py` (90 tests: 5 scam/matching, 17 profile page, 20 education page, 23 experience page, 25 project page)
+- `profiles/migrations/0001` to `0010` (0008, 0009 and 0010 change Education, Experience and Project ordering only and run no SQL)
 
 Templates (Django searches both folders: `DIRS` and `APP_DIRS`):
 
 - `templates/base.html`
 - `templates/registration/login.html`
-- `templates/profiles/profile_edit.html`, `dashboard.html`, `education_list.html`, `education_edit.html`, `skill_list.html`, `experience_list.html`, `experience_edit.html`
+- `templates/profiles/profile_edit.html`, `dashboard.html`, `education_list.html`, `education_edit.html`, `skill_list.html`, `experience_list.html`, `experience_edit.html`, `project_list.html`, `project_edit.html`
 - `templates/profiles/advert_list.html`, `advert_detail.html`, `resume.html`
 - All templates now live under `templates/`. `profile_edit.html` was moved there from `profiles/templates/profiles/` in Feature 2.
 - `base.html` shows Django messages (success, info, warning, error) above every page's content.
@@ -403,6 +403,9 @@ Working browser routes:
 - `/profile/experience/` — list, add and confirm experience
 - `/profile/experience/<id>/edit/` — edit an experience entry (a change makes it unconfirmed)
 - `/profile/experience/<id>/delete/` — POST, remove an experience entry
+- `/profile/projects/` — list, add and confirm projects
+- `/profile/projects/<id>/edit/` — edit a project (a change makes it unconfirmed)
+- `/profile/projects/<id>/delete/` — POST, remove a project
 - `/adverts/` — list adverts and screen a new one
 - `/adverts/<id>/` — risk result, match result, status update, resume link, delete
 - `/adverts/<id>/override/` — POST, match a High-risk advert anyway

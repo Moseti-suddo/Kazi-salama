@@ -36,7 +36,7 @@ New users are signed in immediately after registering. There is no email verific
 
 ## Profile creation
 
-Profile information will be entered through forms and a guided wizard. The wizard is not built yet; entry pages with add and confirm exist for Education, Experience and Skills, and Education and Experience also have edit and remove.
+Profile information will be entered through forms and a guided wizard. The wizard is not built yet; entry pages with add and confirm exist for Education, Experience, Projects and Skills, and Education, Experience and Projects also have edit and remove.
 
 CV upload will come later. It may extract suggested details, but it must not silently confirm or add them to the profile.
 
@@ -70,7 +70,7 @@ Date inputs use `format="%Y-%m-%d"`, because browser date inputs only accept tha
 
 No model fields were added; the existing fields match the spec. "End date or present" is the existing `is_current` checkbox, labelled "I currently work here". Unlike Education, a checkbox fits here because a current job has no known end date to compare with today.
 
-The date rules live in one function, `validate_date_range(form, cleaned_data, current_field=None)` in `profiles/forms.py`, called from `EducationForm.clean()` and `ExperienceForm.clean()` (Projects will be the third user). It rejects an end date before the start date and, when `current_field` is given, a ticked "current" box together with an end date. Both errors go on `end_date`. A mixin class was rejected because its `super()` ordering is harder to follow and gains nothing for three forms. Silently clearing the end date when "current" is ticked was rejected because it discards what the user typed without telling them.
+The date rules live in one function, `validate_date_range(form, cleaned_data, current_field=None)` in `profiles/forms.py`, called from `EducationForm.clean()` and `ExperienceForm.clean()` (and `ProjectForm.clean()` since Feature 5). It rejects an end date before the start date and, when `current_field` is given, a ticked "current" box together with an end date. Both errors go on `end_date`. A mixin class was rejected because its `super()` ordering is harder to follow and gains nothing for three forms. Silently clearing the end date when "current" is ticked was rejected because it discards what the user typed without telling them.
 
 `technologies` stays free text. Linking skills to the entries that support them is Feature 6.
 
@@ -81,6 +81,18 @@ Ordering is in `Meta`: current roles first, then newest end date (blanks first),
 Edit, remove, confirm and messages follow the Education pattern (Feature 3), including resetting confirmation when a saved edit changes a value.
 
 Required fields also get the browser's own "Please fill out this field." bubble, because Django renders a `required` attribute. In Firefox the bubble stays fixed on screen while scrolling; this is browser behaviour, not page CSS. The bubble is kept on every form for instant feedback, with the server-side check as the real safeguard. Adding `novalidate` to forms was rejected for now; if wanted, it should be applied to all forms at once as a separate task.
+
+## Projects (Feature 5, 2026-11-25)
+
+No model fields were added; the existing fields match the spec. "End date or present" is the existing `is_current` checkbox, labelled "I'm still working on this", for the same reason as Experience.
+
+`ProjectForm.clean()` is the third user of `validate_date_range(..., current_field="is_current")`. Writing a separate date check for Projects was rejected so all three forms follow one rule.
+
+The URL field gets no custom `clean_url()`. Django 6's form `URLField` already adds `https://` when the scheme is missing, as on the profile page; a test covers it. On the list page the link opens in a new tab with `rel="noopener noreferrer"`, so the linked site cannot reach the Kazi Salama tab through `window.opener`.
+
+Ordering, edit, remove, confirm and messages follow Experience (Feature 4): current projects first, then newest end date, then newest start date, then `-created_at` (migration 0010, no SQL), and a saved change resets confirmation.
+
+The resume still shows only name, role, description and technologies for projects. Adding outcomes, URL and dates was left for Feature 12 to keep this feature focused.
 
 ## Confirmation
 

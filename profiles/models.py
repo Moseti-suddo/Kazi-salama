@@ -114,6 +114,14 @@ class Project(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = [
+            "-is_current",
+            F("end_date").desc(nulls_first=True),
+            F("start_date").desc(nulls_first=True),
+            "-created_at",
+        ]
+
     def __str__(self):
         return self.name
 

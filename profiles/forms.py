@@ -1,6 +1,6 @@
 import re
 from django import forms
-from .models import Advert, CareerProfile, Education, Experience, Skill
+from .models import Advert, CareerProfile, Education, Experience, Skill, Project
 
 def validate_date_range(form, cleaned_data, current_field=None):
     start = cleaned_data.get("start_date")
@@ -115,6 +115,49 @@ class ExperienceForm(forms.ModelForm):
             "start_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "end_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "responsibilities": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        validate_date_range(self, cleaned_data, current_field="is_current")
+        return cleaned_data
+
+class ProjectForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = [
+            "name",
+            "description",
+            "role",
+            "technologies",
+            "outcomes",
+            "start_date",
+            "end_date",
+            "is_current",
+            "url",
+        ]
+        labels = {
+            "name": "Project name",
+            "role": "Your role or contribution",
+            "technologies": "Technologies and tools",
+            "outcomes": "Results or achievements",
+            "is_current": "I'm still working on this",
+            "url": "Repository, demo or project URL",
+        }
+        help_texts = {
+            "description": "What the project does and the problem it solves.",
+            "role": "e.g. Sole developer, or Backend lead in a team of four.",
+            "technologies": "Separate with commas, e.g. Python, Django, PostgreSQL.",
+            "outcomes": "Optional. e.g. Used by 200 students, or Won the faculty innovation prize.",
+            "start_date": "Optional.",
+            "end_date": "Optional. Leave blank if you are still working on it.",
+            "url": "Optional. e.g. https://github.com/your-name/project",
+        }
+        widgets = {
+            "start_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "end_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "description": forms.Textarea(attrs={"rows": 4}),
+            "outcomes": forms.Textarea(attrs={"rows": 3}),
         }
 
     def clean(self):

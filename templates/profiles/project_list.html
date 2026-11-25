@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Projects | Kazi Salama{% endblock %}
+
+{% block content %}
+<h1>Projects</h1>
+<p class="lead">Coursework, final-year, personal and team projects. Only confirmed entries are used for matching and your resume. Any saved change marks an entry unconfirmed until you confirm it again.</p>
+
+<ul>
+    {% for entry in entries %}
+        <li class="entry">
+            <div>
+                <strong>{{ entry.name }}</strong> · {{ entry.role }}<br>
+                <span class="muted">{{ entry.technologies }}</span>
+                {% if entry.start_date or entry.end_date or entry.is_current %}
+                    <br><span class="muted">
+                        {% if entry.start_date %}{{ entry.start_date|date:"M Y" }}{% endif %}
+                        {% if entry.start_date and entry.end_date or entry.start_date and entry.is_current %} – {% endif %}
+                        {% if entry.is_current %}Present{% elif entry.end_date %}{{ entry.end_date|date:"M Y" }}{% endif %}
+                    </span>
+                {% endif %}
+                {% if entry.url %}
+                    <br><a href="{{ entry.url }}" target="_blank" rel="noopener noreferrer">{{ entry.url }}</a>
+                {% endif %}
+            </div>
+            <div class="entry-actions">
+                {% if entry.is_confirmed %}
+                    <span class="badge ok">Confirmed</span>
+                {% else %}
+                    <span class="badge warn">Unconfirmed</span>
+                {% endif %}
+                <form method="post" action="{% url 'project_confirm' entry.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-small">
+                        {% if entry.is_confirmed %}Unconfirm{% else %}Confirm{% endif %}
+                    </button>
+                </form>
+                <a href="{% url 'project_edit' entry.pk %}">Edit</a>
+                <form method="post" action="{% url 'project_delete' entry.pk %}" onsubmit="return confirm('Remove this project?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-small">Remove</button>
+                </form>
+            </div>
+        </li>
+    {% empty %}
+        <li>No projects yet.</li>
+    {% endfor %}
+</ul>
+
+<h2>Add project</h2>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+        <div class="field">{{ field.as_field_group }}</div>
+    {% endfor %}
+    <button type="submit">Save project</button>
+</form>
+{% endblock %}

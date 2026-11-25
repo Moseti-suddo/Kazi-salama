@@ -19,6 +19,10 @@ from .views import (
     profile_confirm,
     experience_delete,
     experience_edit,
+    project_confirm,
+    project_delete,
+    project_edit,
+    project_list,
 )
 
 urlpatterns = [
@@ -41,4 +45,8 @@ urlpatterns = [
     path("profile/education/<int:pk>/delete/", education_delete, name="education_delete"),
     path("profile/experience/<int:pk>/edit/", experience_edit, name="experience_edit"),
     path("profile/experience/<int:pk>/delete/", experience_delete, name="experience_delete"),
+    path("profile/projects/", project_list, name="project_list"),
+    path("profile/projects/<int:pk>/confirm/", project_confirm, name="project_confirm"),
+    path("profile/projects/<int:pk>/edit/", project_edit, name="project_edit"),
+    path("profile/projects/<int:pk>/delete/", project_delete, name="project_delete"),
 ]

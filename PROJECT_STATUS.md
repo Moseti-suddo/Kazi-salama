@@ -77,6 +77,22 @@ Core demo flow built: profile entries, confirmation, advert screening, skill mat
   - `python manage.py test`: 75 tests pass (10 accounts + 65 profiles), reported by the user and confirmed by a separate run, 2026-11-25
   - Browser check (17 checks) reported all OK by the user: field order and help text, browser blocks empty required fields, end-before-start error, add message and date line, no resubmit on refresh, current-plus-end-date error, current role listed first as "Present", confirm/unconfirm messages, saved dates in edit form, unchanged save keeps confirmation, changed save resets it with a warning, edit error then cancel, remove cancel and OK, dark mode, 404 for an unknown entry, resume still shows experience
   - Slips fixed during the build: `AdvertForm` was deleted and then re-added indented (fixed); `experience_edit.html` was first saved with a trailing space in its name (renamed)
+  - Committed as `bab2493` (2026-11-25)
+- Feature 5 (projects), 2026-11-25:
+  - No model fields added; the existing `Project` fields match the spec
+  - `profiles/models.py`: `Project.Meta.ordering`, same as Experience: `-is_current`, end date newest first (blanks first), start date the same way, `-created_at`
+  - `profiles/migrations/0010_project_ordering.py`: `AlterModelOptions` only. `sqlmigrate profiles 0010` prints `-- (no-op)`. Applied (`showmigrations` shows `[X]`), output seen 2026-11-25
+  - `profiles/forms.py`: new `ProjectForm`: required fields first, spec labels ("Project name", "Your role or contribution", "Technologies and tools", "Results or achievements", "I'm still working on this", "Repository, demo or project URL"), help text, `DateInput(format="%Y-%m-%d")`, `clean()` using `validate_date_range(..., current_field="is_current")`. `https://` is added to scheme-less URLs by Django 6's form `URLField`, not by custom code
+  - `profiles/views.py`: new `project_list` (list and add), `project_confirm`, `project_edit` (own entries only, a changed value resets `is_confirmed`, warning if it was confirmed) and `project_delete` (POST only, own entries only), with messages. The dashboard Projects card now links to `project_list`
+  - `profiles/urls.py`: `/profile/projects/` (`project_list`), `/profile/projects/<pk>/confirm/`, `/edit/`, `/delete/`
+  - `templates/profiles/project_list.html`: name and role, technologies, date line ("Jan 2026 – Present"), URL link opening in a new tab with `rel="noopener noreferrer"`, confirm/Edit/Remove
+  - `templates/profiles/project_edit.html`: new edit page
+  - `templates/base.html`: sidebar Projects link between Experience and Adverts
+  - `profiles/tests.py`: 25 new `ProjectPageTests` (includes `https://` added to URLs, invalid URL rejected, dashboard link)
+  - `python manage.py check`: no issues; `makemigrations --check --dry-run`: `No changes detected` (seen 2026-11-25)
+  - `python manage.py test`: 100 tests pass (10 accounts + 90 profiles), output seen 2026-11-25; after the fixes below, `python manage.py test profiles`: 90 pass, output seen
+  - Browser check (15 checks) reported all passing by the user: sidebar and single dashboard card, field order and help text, browser blocks empty required fields, end-before-start error, current-plus-end-date error, add message and `https://` link in a new tab, no resubmit on refresh, current project first as "Present", confirm/unconfirm messages, saved dates in edit form, unchanged save keeps confirmation, changed save resets it with a warning, remove cancel and OK, dark mode, 404 for an unknown entry, confirmed project on the resume
+  - Slips fixed during the build: the dashboard got a second Projects card because the new tuple was appended instead of replacing the old `None` one (old line removed); the sidebar link was first placed after Adverts (moved)
 
 ## Code provided, not yet verified
 
@@ -107,7 +123,8 @@ Checked the documentation against the code:
 - `SECRET_KEY` is committed in `settings.py`. Acceptable for local development only. Move to an environment variable before sharing or deploying.
 - Skills can be duplicated; no uniqueness rule
 - Skill categories limited to five fixed choices
-- No date validation on Project yet. Use `validate_date_range(self, cleaned_data, current_field="is_current")` in Feature 5.
+- Resume (Feature 12): projects show only name, role, description and technologies; outcomes, URL and dates are left out
+- Django Admin registers only `CareerProfile`; Education, Experience, Projects and the other entry types are not in Admin
 - Resume (Feature 12): it shows only the education end-date year and does not mark expected completion dates
 - Every skill is "Claimed"; SkillEvidence does not exist yet
 - Resume (Feature 12): it uses personal details even when `profile_confirmed` is False, and prints an empty heading if the full name is blank (possible because `get_profile()` creates profiles with a blank name)
@@ -115,8 +132,8 @@ Checked the documentation against the code:
 - Matching only recognises the fixed `KNOWN_SKILLS` list plus the user's confirmed skills. Unusual skills in an advert are missed. No partial-match category yet.
 - LLM extraction is not built. The rule engine and fixed skill list do all the work.
 - Resume generation is built although earlier documents listed CV generation as deferred. See DECISIONS.md.
-- No Projects, Certifications or Achievements pages (dashboard shows "Coming soon")
-- No edit or remove for Skills and the other entry types (Education and Experience have both; personal details have edit, and no remove by decision)
+- No Certifications or Achievements pages (dashboard shows "Coming soon")
+- No edit or remove for Skills, Certifications and Achievements (Education, Experience and Projects have both; personal details have edit, and no remove by decision)
 - No status history, notes, next action or reminder date on adverts (only current status and deadline)
 - No wizard, Save Draft or Review and Confirm screen
 
@@ -128,12 +145,12 @@ None. PostgreSQL must be active for Django database commands.
 
 Working one feature at a time, end to end (model → views → tests → browser check → docs → commit).
 
-Feature order: 0 Foundation (done) → 1 Accounts (done) → 2 Personal details (done) → 3 Education (done) → 4 Experience (done) → 5 Projects → 6 Skills → 7 Certifications and Achievements → 8 Wizard and Review → 9 Advert screening → 10 Matching → 11 Tracker → 12 Resume
+Feature order: 0 Foundation (done) → 1 Accounts (done) → 2 Personal details (done) → 3 Education (done) → 4 Experience (done) → 5 Projects (done) → 6 Skills → 7 Certifications and Achievements → 8 Wizard and Review → 9 Advert screening → 10 Matching → 11 Tracker → 12 Resume
 
-Features 0 and 1 were committed as `0e732e7`, Feature 2 as `2a7a19e` and Feature 3 as `6802dc7`. Feature 4 is committed next (the files listed above, the new migration and template, plus the three docs; leave out `notes.txt`).
+Features 0 and 1 were committed as `0e732e7`, Feature 2 as `2a7a19e`, Feature 3 as `6802dc7` and Feature 4 as `bab2493`. Feature 5 is committed next (the files listed above, migration 0010, the two new templates, plus the three docs; leave out `notes.txt`).
 
-Next: Feature 5, Projects. Step 1 is a read-only review of the `Project` model against PROJECT_CONTEXT.md section 4. There is no Projects page yet (the dashboard card shows "Coming soon" with no URL). Look at: a `ProjectForm` with spec labels ("Project name", "Your role or contribution", "Technologies and tools", "Results or achievements", "Repository, demo or project URL", "I'm still working on this"), `validate_date_range(..., current_field="is_current")`, `DateInput(format="%Y-%m-%d")`, URL handling (the form adds `https://` when missing), `Meta.ordering` like Experience (no-op migration 0010), list/add/confirm/edit/remove views and URLs following Features 3–4, linking the dashboard card, messages, templates, and tests. The resume already reads confirmed projects; don't break it.
+Next: Feature 6, Skills. Step 1 is a read-only review of the `Skill` model, `SkillForm`, `skill_list`/`skill_confirm` and `skill_list.html` against PROJECT_CONTEXT.md section 4 (Skills: name, category, optional proficiency, supporting profile-entry links, notes; Claimed vs Supported). Known gaps to decide on: no edit or remove, duplicate skills allowed, five fixed categories, every skill "Claimed" because SkillEvidence does not exist. Matching and the resume read confirmed skills; don't break them.
 
 ## Panel explanation
 
-The career profile is one record per Django user, with related entry tables in PostgreSQL. Each entry has an `is_confirmed` flag, and the system enforces its central rule: only confirmed entries are used for matching and document generation. A pasted advert is screened by plain Python rules that produce a Low, Medium or High scam-risk result with the indicators that fired. The result is a warning, not proof of fraud. High-risk adverts skip matching unless the user explicitly overrides. Otherwise the advert is compared with the user's confirmed skills to give matched skills, missing skills and a score. The user tracks the application status manually, and the system never submits anything. A tailored resume can be generated from confirmed entries only. Not built yet: LLM extraction, the guided wizard, edit/remove for most entry types (Education and Experience have them), status history, and SkillEvidence.
+The career profile is one record per Django user, with related entry tables in PostgreSQL. Each entry has an `is_confirmed` flag, and the system enforces its central rule: only confirmed entries are used for matching and document generation. A pasted advert is screened by plain Python rules that produce a Low, Medium or High scam-risk result with the indicators that fired. The result is a warning, not proof of fraud. High-risk adverts skip matching unless the user explicitly overrides. Otherwise the advert is compared with the user's confirmed skills to give matched skills, missing skills and a score. The user tracks the application status manually, and the system never submits anything. A tailored resume can be generated from confirmed entries only. Not built yet: LLM extraction, the guided wizard, edit/remove for Skills, Certifications and Achievements (Education, Experience and Projects have them), status history, and SkillEvidence.

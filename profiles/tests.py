@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import CareerProfile, Education, Experience
+from .models import CareerProfile, Education, Experience, Project
 from .matching import match_skills
 from .scam import screen_advert
 
@@ -612,6 +612,235 @@ class ExperiencePageTests(TestCase):
     def test_cannot_confirm_other_users_entry(self):
         entry = self.other_entry()
         response = self.client.post(reverse("experience_confirm", args=[entry.pk]))
+        self.assertEqual(response.status_code, 404)
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_confirmed)
+
+class ProjectPageTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("amina", "amina@example.com", PASSWORD)
+        self.client.force_login(self.user)
+        self.profile = CareerProfile.objects.create(user=self.user, full_name="Amina Otieno")
+        self.url = reverse("project_list")
+
+    def valid_data(self, **overrides):
+        data = {
+            "name": "Kazi Salama",
+            "description": "Career profile and job-advert scam screening.",
+            "role": "Sole developer",
+            "technologies": "Python, Django, PostgreSQL",
+            "outcomes": "Presented to the project panel.",
+            "start_date": "2026-01-12",
+            "end_date": "2026-11-30",
+            "url": "https://github.com/amina/kazi",
+        }
+        data.update(overrides)
+        return data
+
+    def make_entry(self, profile=None, **overrides):
+        fields = {
+            "name": "Kazi Salama",
+            "description": "Career profile and job-advert scam screening.",
+            "role": "Sole developer",
+            "technologies": "Python, Django, PostgreSQL",
+            "outcomes": "Presented to the project panel.",
+            "start_date": date(2026, 1, 12),
+            "end_date": date(2026, 11, 30),
+            "url": "https://github.com/amina/kazi",
+        }
+        fields.update(overrides)
+        return Project.objects.create(profile=profile or self.profile, **fields)
+
+    def other_entry(self):
+        other = User.objects.create_user("bob", "bob@example.com", PASSWORD)
+        other_profile = CareerProfile.objects.create(user=other, full_name="Bob")
+        return self.make_entry(profile=other_profile, name="Bob's project")
+
+    # --- access and adding ---
+
+    def test_login_required(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertRedirects(response, f"{reverse('login')}?next={self.url}")
+
+    def test_add_entry(self):
+        response = self.client.post(self.url, self.valid_data(), follow=True)
+        self.assertRedirects(response, self.url)
+        self.assertContains(response, "Project added.")
+        entry = Project.objects.get()
+        self.assertEqual(entry.profile, self.profile)
+        self.assertEqual(entry.start_date, date(2026, 1, 12))
+        self.assertFalse(entry.is_current)
+        self.assertFalse(entry.is_confirmed)
+
+    def test_required_fields(self):
+        for field in ["name", "description", "role", "technologies"]:
+            with self.subTest(field=field):
+                response = self.client.post(self.url, self.valid_data(**{field: ""}))
+                self.assertEqual(response.status_code, 200)
+                self.assertFormError(response.context["form"], field, "This field is required.")
+        self.assertEqual(Project.objects.count(), 0)
+
+    def test_optional_fields_blank(self):
+        self.client.post(
+            self.url,
+            self.valid_data(outcomes="", start_date="", end_date="", url=""),
+        )
+        entry = Project.objects.get()
+        self.assertIsNone(entry.start_date)
+        self.assertIsNone(entry.end_date)
+        self.assertEqual(entry.url, "")
+
+    def test_url_without_scheme_gets_https(self):
+        self.client.post(self.url, self.valid_data(url="github.com/amina/kazi"))
+        self.assertEqual(Project.objects.get().url, "https://github.com/amina/kazi")
+
+    def test_invalid_url_rejected(self):
+        response = self.client.post(self.url, self.valid_data(url="not a url"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("url", response.context["form"].errors)
+        self.assertEqual(Project.objects.count(), 0)
+
+    # --- date rules ---
+
+    def test_end_before_start_rejected(self):
+        response = self.client.post(
+            self.url, self.valid_data(start_date="2026-06-01", end_date="2026-01-01")
+        )
+        self.assertFormError(
+            response.context["form"], "end_date", "End date cannot be before the start date."
+        )
+        self.assertEqual(Project.objects.count(), 0)
+
+    def test_equal_dates_allowed(self):
+        self.client.post(self.url, self.valid_data(start_date="2026-03-01", end_date="2026-03-01"))
+        self.assertEqual(Project.objects.count(), 1)
+
+    def test_current_with_end_date_rejected(self):
+        response = self.client.post(self.url, self.valid_data(is_current="on"))
+        self.assertFormError(
+            response.context["form"],
+            "end_date",
+            "Leave the end date blank if you are still doing this.",
+        )
+        self.assertEqual(Project.objects.count(), 0)
+
+    def test_current_without_end_date_allowed(self):
+        self.client.post(self.url, self.valid_data(is_current="on", end_date=""))
+        entry = Project.objects.get()
+        self.assertTrue(entry.is_current)
+        self.assertIsNone(entry.end_date)
+
+    def test_current_shown_as_present(self):
+        self.make_entry(is_current=True, end_date=None)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Jan 2026")
+        self.assertContains(response, "Present")
+
+    # --- listing and ordering ---
+
+    def test_only_own_entries_listed(self):
+        self.other_entry()
+        mine = self.make_entry()
+        response = self.client.get(self.url)
+        self.assertEqual(list(response.context["entries"]), [mine])
+
+    def test_ordering_current_first_then_most_recent(self):
+        older = self.make_entry(start_date=date(2023, 1, 1), end_date=date(2023, 6, 1))
+        current = self.make_entry(start_date=date(2025, 1, 1), end_date=None, is_current=True)
+        newer = self.make_entry(start_date=date(2024, 1, 1), end_date=date(2024, 12, 1))
+        response = self.client.get(self.url)
+        self.assertEqual(list(response.context["entries"]), [current, newer, older])
+
+    def test_dashboard_links_to_projects(self):
+        response = self.client.get(reverse("dashboard"))
+        self.assertContains(response, f'href="{self.url}"')
+
+    # --- edit ---
+
+    def test_edit_page_shows_saved_dates(self):
+        entry = self.make_entry()
+        response = self.client.get(reverse("project_edit", args=[entry.pk]))
+        self.assertContains(response, 'value="2026-01-12"')
+        self.assertContains(response, 'value="2026-11-30"')
+
+    def test_edit_saves_changes(self):
+        entry = self.make_entry()
+        response = self.client.post(
+            reverse("project_edit", args=[entry.pk]),
+            self.valid_data(role="Backend lead"),
+        )
+        self.assertRedirects(response, self.url)
+        entry.refresh_from_db()
+        self.assertEqual(entry.role, "Backend lead")
+
+    def test_edit_resets_confirmation(self):
+        entry = self.make_entry(is_confirmed=True)
+        response = self.client.post(
+            reverse("project_edit", args=[entry.pk]),
+            self.valid_data(role="Backend lead"),
+            follow=True,
+        )
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_confirmed)
+        self.assertContains(response, "please confirm it again")
+
+    def test_unchanged_edit_keeps_confirmation(self):
+        entry = self.make_entry(is_confirmed=True)
+        self.client.post(reverse("project_edit", args=[entry.pk]), self.valid_data())
+        entry.refresh_from_db()
+        self.assertTrue(entry.is_confirmed)
+
+    def test_edit_with_bad_dates_not_saved(self):
+        entry = self.make_entry()
+        response = self.client.post(
+            reverse("project_edit", args=[entry.pk]),
+            self.valid_data(end_date="2025-01-01"),
+        )
+        self.assertEqual(response.status_code, 200)
+        entry.refresh_from_db()
+        self.assertEqual(entry.end_date, date(2026, 11, 30))
+
+    def test_cannot_edit_other_users_entry(self):
+        entry = self.other_entry()
+        response = self.client.get(reverse("project_edit", args=[entry.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    # --- remove ---
+
+    def test_delete_removes_entry(self):
+        entry = self.make_entry()
+        response = self.client.post(reverse("project_delete", args=[entry.pk]))
+        self.assertRedirects(response, self.url)
+        self.assertFalse(Project.objects.filter(pk=entry.pk).exists())
+
+    def test_delete_requires_post(self):
+        entry = self.make_entry()
+        response = self.client.get(reverse("project_delete", args=[entry.pk]))
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(Project.objects.filter(pk=entry.pk).exists())
+
+    def test_cannot_delete_other_users_entry(self):
+        entry = self.other_entry()
+        response = self.client.post(reverse("project_delete", args=[entry.pk]))
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Project.objects.filter(pk=entry.pk).exists())
+
+    # --- confirm ---
+
+    def test_confirm_toggles(self):
+        entry = self.make_entry()
+        url = reverse("project_confirm", args=[entry.pk])
+        self.client.post(url)
+        entry.refresh_from_db()
+        self.assertTrue(entry.is_confirmed)
+        self.client.post(url)
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_confirmed)
+
+    def test_cannot_confirm_other_users_entry(self):
+        entry = self.other_entry()
+        response = self.client.post(reverse("project_confirm", args=[entry.pk]))
         self.assertEqual(response.status_code, 404)
         entry.refresh_from_db()
         self.assertFalse(entry.is_confirmed)
