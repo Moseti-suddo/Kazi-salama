@@ -36,7 +36,7 @@ New users are signed in immediately after registering. There is no email verific
 
 ## Profile creation
 
-Profile information will be entered through forms and a guided wizard. The wizard is not built yet; entry pages with add and confirm exist for Education, Experience and Skills.
+Profile information will be entered through forms and a guided wizard. The wizard is not built yet; entry pages with add and confirm exist for Education, Experience and Skills, and Education and Experience also have edit and remove.
 
 CV upload will come later. It may extract suggested details, but it must not silently confirm or add them to the profile.
 
@@ -58,13 +58,29 @@ No model fields were added; the existing fields match the spec.
 
 "Expected completion" is a future `end_date`, labelled "End date or expected completion". The `is_expected` property (end date after today in Africa/Nairobi) is computed when the page is shown. An `is_expected` or `is_current` checkbox was rejected because it needs a migration and allows contradictions such as a ticked box with a past date.
 
-An end date before the start date is rejected in `EducationForm.clean()`, with the error on `end_date`. Equal dates and blank dates are allowed. A database `CheckConstraint` was rejected because it needs a migration that fails if any existing row breaks the rule. `Model.clean()` was rejected to keep validation in forms, like the phone and email rules. Experience and Projects need the same rule; it should become a shared helper in Feature 4, once there is a second use.
+An end date before the start date is rejected in `EducationForm.clean()`, with the error on `end_date`. Equal dates and blank dates are allowed. A database `CheckConstraint` was rejected because it needs a migration that fails if any existing row breaks the rule. `Model.clean()` was rejected to keep validation in forms, like the phone and email rules. Since Feature 4 the rule lives in the shared `validate_date_range()` helper (see Experience below).
 
 Ordering is explicit: blank end dates first (usually still studying), then newest end date, then start date, then `-created_at` so the order never depends on chance. This needed migration 0008, which runs no SQL. The ordering stays in `Meta` because the dashboard and resume rely on it too.
 
 Edit is a separate page (`/profile/education/<pk>/edit/`). Editing inside the list page was rejected because it mixes two forms in one view, and HTMX is deferred. Remove is POST only with a browser confirm prompt, the same as advert delete; a separate confirmation page was rejected as an extra view and template. Edit, remove and confirm all look up entries with `profile__user=request.user`, so another user's entry returns 404.
 
 Date inputs use `format="%Y-%m-%d"`, because browser date inputs only accept that format. Without it a saved date could show as blank on the edit page and be wiped on save.
+
+## Experience (Feature 4, 2026-11-25)
+
+No model fields were added; the existing fields match the spec. "End date or present" is the existing `is_current` checkbox, labelled "I currently work here". Unlike Education, a checkbox fits here because a current job has no known end date to compare with today.
+
+The date rules live in one function, `validate_date_range(form, cleaned_data, current_field=None)` in `profiles/forms.py`, called from `EducationForm.clean()` and `ExperienceForm.clean()` (Projects will be the third user). It rejects an end date before the start date and, when `current_field` is given, a ticked "current" box together with an end date. Both errors go on `end_date`. A mixin class was rejected because its `super()` ordering is harder to follow and gains nothing for three forms. Silently clearing the end date when "current" is ticked was rejected because it discards what the user typed without telling them.
+
+`technologies` stays free text. Linking skills to the entries that support them is Feature 6.
+
+The experience types stay Employment, Internship and Volunteer. Adding "Attachment" (Kenyan industrial attachment) was considered and left for later; it needs only a `choices` migration.
+
+Ordering is in `Meta`: current roles first, then newest end date (blanks first), then newest start date, then `-created_at`. This needed migration 0009, which runs no SQL. The list view and the resume no longer call `.order_by("-start_date")`; the resume's relevance sort is stable, so equally relevant entries keep this order.
+
+Edit, remove, confirm and messages follow the Education pattern (Feature 3), including resetting confirmation when a saved edit changes a value.
+
+Required fields also get the browser's own "Please fill out this field." bubble, because Django renders a `required` attribute. In Firefox the bubble stays fixed on screen while scrolling; this is browser behaviour, not page CSS. The bubble is kept on every form for instant feedback, with the server-side check as the real safeguard. Adding `novalidate` to forms was rejected for now; if wanted, it should be applied to all forms at once as a separate task.
 
 ## Confirmation
 

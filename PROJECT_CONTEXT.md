@@ -305,13 +305,13 @@ Profiles app files:
 - `profiles/scam.py` (scam rules)
 - `profiles/matching.py` (skill matching)
 - `profiles/tests.py` (42 tests: 5 scam/matching, 17 profile page, 20 education page)
-- `profiles/migrations/0001` to `0008` (0008 changes Education ordering only and runs no SQL)
+- `profiles/migrations/0001` to `0009` (0008 and 0009 change Education and Experience ordering only and run no SQL)
 
 Templates (Django searches both folders: `DIRS` and `APP_DIRS`):
 
 - `templates/base.html`
 - `templates/registration/login.html`
-- `templates/profiles/profile_edit.html`, `dashboard.html`, `education_list.html`, `education_edit.html`, `skill_list.html`, `experience_list.html`
+- `templates/profiles/profile_edit.html`, `dashboard.html`, `education_list.html`, `education_edit.html`, `skill_list.html`, `experience_list.html`, `experience_edit.html`
 - `templates/profiles/advert_list.html`, `advert_detail.html`, `resume.html`
 - All templates now live under `templates/`. `profile_edit.html` was moved there from `profiles/templates/profiles/` in Feature 2.
 - `base.html` shows Django messages (success, info, warning, error) above every page's content.
@@ -401,6 +401,8 @@ Working browser routes:
 - `/profile/education/<id>/delete/` — POST, remove an education entry
 - `/profile/skills/` — list, add and confirm skills
 - `/profile/experience/` — list, add and confirm experience
+- `/profile/experience/<id>/edit/` — edit an experience entry (a change makes it unconfirmed)
+- `/profile/experience/<id>/delete/` — POST, remove an experience entry
 - `/adverts/` — list adverts and screen a new one
 - `/adverts/<id>/` — risk result, match result, status update, resume link, delete
 - `/adverts/<id>/override/` — POST, match a High-risk advert anyway
@@ -408,7 +410,7 @@ Working browser routes:
 - `/adverts/<id>/delete/` — POST, delete advert
 - `/adverts/<id>/resume/` — tailored resume (only after matching)
 
-Provided but not yet verified in the browser: skill add, experience page, delete advert, sidebar restyle and dark mode, resume page.
+Provided but not yet verified in the browser: skill add, delete advert, sidebar restyle and dark mode, resume page.
 
 
 The next implementation step is in PROJECT_STATUS.md.

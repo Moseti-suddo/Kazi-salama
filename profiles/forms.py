@@ -2,6 +2,14 @@ import re
 from django import forms
 from .models import Advert, CareerProfile, Education, Experience, Skill
 
+def validate_date_range(form, cleaned_data, current_field=None):
+    start = cleaned_data.get("start_date")
+    end = cleaned_data.get("end_date")
+    if start and end and end < start:
+        form.add_error("end_date", "End date cannot be before the start date.")
+    if current_field and cleaned_data.get(current_field) and end:
+        form.add_error("end_date", "Leave the end date blank if you are still doing this.")
+
 class CareerProfileForm(forms.ModelForm):
     class Meta:
         model = CareerProfile
@@ -64,10 +72,7 @@ class EducationForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        start = cleaned_data.get("start_date")
-        end = cleaned_data.get("end_date")
-        if start and end and end < start:
-            self.add_error("end_date", "End date cannot be before the start date.")
+        validate_date_range(self, cleaned_data)
         return cleaned_data
 
 class SkillForm(forms.ModelForm):
@@ -85,18 +90,38 @@ class ExperienceForm(forms.ModelForm):
             "organisation",
             "role",
             "experience_type",
+            "responsibilities",
             "location",
             "start_date",
             "end_date",
             "is_current",
-            "responsibilities",
             "technologies",
         ]
+        labels = {
+            "role": "Role title",
+            "responsibilities": "Responsibilities and achievements",
+            "location": "Location or remote status",
+            "is_current": "I currently work here",
+            "technologies": "Technologies or skills used",
+        }
+        help_texts = {
+            "responsibilities": "What you did and what changed because of it.",
+            "location": "Optional. e.g. Nairobi, or Remote.",
+            "start_date": "Optional.",
+            "end_date": "Optional. Leave blank if you still work here.",
+            "technologies": "Optional. Separate with commas, e.g. Python, Django, PostgreSQL.",
+        }
         widgets = {
-            "start_date": forms.DateInput(attrs={"type": "date"}),
-            "end_date": forms.DateInput(attrs={"type": "date"}),
+            "start_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "end_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "responsibilities": forms.Textarea(attrs={"rows": 4}),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        validate_date_range(self, cleaned_data, current_field="is_current")
+        return cleaned_data
+
 
 class AdvertForm(forms.ModelForm):
     class Meta:

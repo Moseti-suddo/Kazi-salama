@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import CareerProfile, Education
+from .models import CareerProfile, Education, Experience
 from .matching import match_skills
 from .scam import screen_advert
 
@@ -394,3 +394,224 @@ class EducationPageTests(TestCase):
             list(Education.objects.filter(profile=self.profile)),
             [no_dates, newer, older],
         )
+
+class ExperiencePageTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("amina", "amina@example.com", PASSWORD)
+        self.client.force_login(self.user)
+        self.profile = CareerProfile.objects.create(user=self.user, full_name="Amina Otieno")
+        self.url = reverse("experience_list")
+
+    def valid_data(self, **overrides):
+        data = {
+            "organisation": "Safaricom",
+            "role": "Software Engineering Intern",
+            "experience_type": "internship",
+            "responsibilities": "Built internal Django dashboards.",
+            "location": "Nairobi",
+            "start_date": "2024-01-08",
+            "end_date": "2024-06-28",
+            "technologies": "Python, Django",
+        }
+        data.update(overrides)
+        return data
+
+    def make_entry(self, profile=None, **overrides):
+        fields = {
+            "organisation": "Safaricom",
+            "role": "Software Engineering Intern",
+            "experience_type": "internship",
+            "responsibilities": "Built internal Django dashboards.",
+            "location": "Nairobi",
+            "start_date": date(2024, 1, 8),
+            "end_date": date(2024, 6, 28),
+            "technologies": "Python, Django",
+        }
+        fields.update(overrides)
+        return Experience.objects.create(profile=profile or self.profile, **fields)
+
+    def other_entry(self):
+        other = User.objects.create_user("bob", "bob@example.com", PASSWORD)
+        other_profile = CareerProfile.objects.create(user=other, full_name="Bob")
+        return self.make_entry(profile=other_profile, role="Volunteer Tutor")
+
+    # --- access and adding ---
+
+    def test_login_required(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertRedirects(response, f"{reverse('login')}?next={self.url}")
+
+    def test_add_entry(self):
+        response = self.client.post(self.url, self.valid_data(), follow=True)
+        self.assertRedirects(response, self.url)
+        self.assertContains(response, "Experience added.")
+        entry = Experience.objects.get()
+        self.assertEqual(entry.profile, self.profile)
+        self.assertEqual(entry.start_date, date(2024, 1, 8))
+        self.assertFalse(entry.is_current)
+        self.assertFalse(entry.is_confirmed)
+
+    def test_required_fields(self):
+        for field in ["organisation", "role", "experience_type", "responsibilities"]:
+            with self.subTest(field=field):
+                response = self.client.post(self.url, self.valid_data(**{field: ""}))
+                self.assertEqual(response.status_code, 200)
+                self.assertFormError(response.context["form"], field, "This field is required.")
+        self.assertEqual(Experience.objects.count(), 0)
+
+    def test_optional_fields_blank(self):
+        self.client.post(
+            self.url,
+            self.valid_data(location="", start_date="", end_date="", technologies=""),
+        )
+        entry = Experience.objects.get()
+        self.assertIsNone(entry.start_date)
+        self.assertIsNone(entry.end_date)
+        self.assertEqual(entry.location, "")
+
+    def test_unknown_experience_type_rejected(self):
+        response = self.client.post(self.url, self.valid_data(experience_type="freelance"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("experience_type", response.context["form"].errors)
+        self.assertEqual(Experience.objects.count(), 0)
+
+    # --- date rules ---
+
+    def test_end_before_start_rejected(self):
+        response = self.client.post(
+            self.url, self.valid_data(start_date="2024-06-01", end_date="2024-01-01")
+        )
+        self.assertFormError(
+            response.context["form"], "end_date", "End date cannot be before the start date."
+        )
+        self.assertEqual(Experience.objects.count(), 0)
+
+    def test_equal_dates_allowed(self):
+        self.client.post(self.url, self.valid_data(start_date="2024-03-01", end_date="2024-03-01"))
+        self.assertEqual(Experience.objects.count(), 1)
+
+    def test_current_with_end_date_rejected(self):
+        response = self.client.post(self.url, self.valid_data(is_current="on"))
+        self.assertFormError(
+            response.context["form"],
+            "end_date",
+            "Leave the end date blank if you are still doing this.",
+        )
+        self.assertEqual(Experience.objects.count(), 0)
+
+    def test_current_without_end_date_allowed(self):
+        self.client.post(self.url, self.valid_data(is_current="on", end_date=""))
+        entry = Experience.objects.get()
+        self.assertTrue(entry.is_current)
+        self.assertIsNone(entry.end_date)
+
+    def test_current_shown_as_present(self):
+        self.make_entry(is_current=True, end_date=None)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Jan 2024")
+        self.assertContains(response, "Present")
+
+    # --- listing and ordering ---
+
+    def test_only_own_entries_listed(self):
+        self.other_entry()
+        mine = self.make_entry()
+        response = self.client.get(self.url)
+        self.assertEqual(list(response.context["entries"]), [mine])
+
+    def test_ordering_current_first_then_most_recent(self):
+        older = self.make_entry(start_date=date(2019, 1, 1), end_date=date(2020, 1, 1))
+        current = self.make_entry(start_date=date(2023, 1, 1), end_date=None, is_current=True)
+        newer = self.make_entry(start_date=date(2021, 1, 1), end_date=date(2022, 12, 31))
+        response = self.client.get(self.url)
+        self.assertEqual(list(response.context["entries"]), [current, newer, older])
+
+    # --- edit ---
+
+    def test_edit_page_shows_saved_dates(self):
+        entry = self.make_entry()
+        response = self.client.get(reverse("experience_edit", args=[entry.pk]))
+        self.assertContains(response, 'value="2024-01-08"')
+        self.assertContains(response, 'value="2024-06-28"')
+
+    def test_edit_saves_changes(self):
+        entry = self.make_entry()
+        response = self.client.post(
+            reverse("experience_edit", args=[entry.pk]),
+            self.valid_data(role="Junior Developer"),
+        )
+        self.assertRedirects(response, self.url)
+        entry.refresh_from_db()
+        self.assertEqual(entry.role, "Junior Developer")
+
+    def test_edit_resets_confirmation(self):
+        entry = self.make_entry(is_confirmed=True)
+        response = self.client.post(
+            reverse("experience_edit", args=[entry.pk]),
+            self.valid_data(role="Junior Developer"),
+            follow=True,
+        )
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_confirmed)
+        self.assertContains(response, "please confirm it again")
+
+    def test_unchanged_edit_keeps_confirmation(self):
+        entry = self.make_entry(is_confirmed=True)
+        self.client.post(reverse("experience_edit", args=[entry.pk]), self.valid_data())
+        entry.refresh_from_db()
+        self.assertTrue(entry.is_confirmed)
+
+    def test_edit_with_bad_dates_not_saved(self):
+        entry = self.make_entry()
+        response = self.client.post(
+            reverse("experience_edit", args=[entry.pk]),
+            self.valid_data(end_date="2023-01-01"),
+        )
+        self.assertEqual(response.status_code, 200)
+        entry.refresh_from_db()
+        self.assertEqual(entry.end_date, date(2024, 6, 28))
+
+    def test_cannot_edit_other_users_entry(self):
+        entry = self.other_entry()
+        response = self.client.get(reverse("experience_edit", args=[entry.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    # --- remove ---
+
+    def test_delete_removes_entry(self):
+        entry = self.make_entry()
+        response = self.client.post(reverse("experience_delete", args=[entry.pk]))
+        self.assertRedirects(response, self.url)
+        self.assertFalse(Experience.objects.filter(pk=entry.pk).exists())
+
+    def test_delete_requires_post(self):
+        entry = self.make_entry()
+        response = self.client.get(reverse("experience_delete", args=[entry.pk]))
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(Experience.objects.filter(pk=entry.pk).exists())
+
+    def test_cannot_delete_other_users_entry(self):
+        entry = self.other_entry()
+        response = self.client.post(reverse("experience_delete", args=[entry.pk]))
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Experience.objects.filter(pk=entry.pk).exists())
+
+    # --- confirm ---
+
+    def test_confirm_toggles(self):
+        entry = self.make_entry()
+        url = reverse("experience_confirm", args=[entry.pk])
+        self.client.post(url)
+        entry.refresh_from_db()
+        self.assertTrue(entry.is_confirmed)
+        self.client.post(url)
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_confirmed)
+
+    def test_cannot_confirm_other_users_entry(self):
+        entry = self.other_entry()
+        response = self.client.post(reverse("experience_confirm", args=[entry.pk]))
+        self.assertEqual(response.status_code, 404)
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_confirmed)

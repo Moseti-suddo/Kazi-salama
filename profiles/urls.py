@@ -17,6 +17,8 @@ from .views import (
     advert_delete,
     advert_resume,
     profile_confirm,
+    experience_delete,
+    experience_edit,
 )
 
 urlpatterns = [
@@ -37,4 +39,6 @@ urlpatterns = [
     path("adverts/<int:pk>/resume/", advert_resume, name="advert_resume"),
     path("profile/education/<int:pk>/edit/", education_edit, name="education_edit"),
     path("profile/education/<int:pk>/delete/", education_delete, name="education_delete"),
+    path("profile/experience/<int:pk>/edit/", experience_edit, name="experience_edit"),
+    path("profile/experience/<int:pk>/delete/", experience_delete, name="experience_delete"),
 ]

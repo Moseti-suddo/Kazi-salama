@@ -1,6 +1,6 @@
 # Kazi Salama — Project Status
 
-Last updated: 2026-11-23
+Last updated: 2026-11-25
 
 ## Current phase
 
@@ -63,12 +63,25 @@ Core demo flow built: profile entries, confirmation, advert screening, skill mat
   - `makemigrations --check --dry-run` reports `No changes detected` (seen 2026-11-23)
   - `python manage.py test -v 2`: 52 tests pass (10 accounts + 42 profiles), output seen 2026-11-23
   - Browser check (16 checks) reported done by the user: field order, labels and help text, required-field and date errors, add message, no resubmit on refresh, Expected label, ordering, confirm/unconfirm, saved dates in edit form, unchanged save keeps confirmation, changed save resets it with a warning, edit error then cancel, remove cancel and OK, dark mode, 404 for an unknown entry
+  - Committed as `6802dc7` (2026-11-23)
+- Feature 4 (experience), 2026-11-25:
+  - `profiles/forms.py`: new shared `validate_date_range(form, cleaned_data, current_field=None)` (end date before start rejected; with `current_field`, a ticked "current" box plus an end date rejected; both errors on `end_date`). `EducationForm.clean()` now calls it (behaviour unchanged). `ExperienceForm`: required fields first, spec labels ("Role title", "Responsibilities and achievements", "Location or remote status", "I currently work here", "Technologies or skills used"), help text, `DateInput(format="%Y-%m-%d")`, `clean()` using the helper
+  - `profiles/models.py`: `Experience.Meta.ordering`: `-is_current`, end date newest first (blanks first), start date the same way, `-created_at`
+  - `profiles/migrations/0009_experience_ordering.py`: `AlterModelOptions` only. `sqlmigrate profiles 0009` prints `-- (no-op)`. Applied (`showmigrations` shows `[X]`)
+  - `profiles/views.py`: `experience_list` uses the model ordering and shows "Experience added."; `experience_confirm` shows confirm/unconfirm messages; new `experience_edit` (own entries only, a changed value resets `is_confirmed`, warning if it was confirmed) and `experience_delete` (POST only, own entries only). The resume view no longer calls `.order_by("-start_date")` on experience; its stable relevance sort keeps the model order for ties
+  - `profiles/urls.py`: `/profile/experience/<pk>/edit/` (`experience_edit`) and `/profile/experience/<pk>/delete/` (`experience_delete`)
+  - `templates/profiles/experience_list.html`: type and location line, date line ("Jan 2024 – Present"), Edit link, Remove button with a browser confirm prompt, fields rendered with `as_field_group`
+  - `templates/profiles/experience_edit.html`: new edit page
+  - `profiles/tests.py`: 23 new `ExperiencePageTests`
+  - `python manage.py check`: no issues; `makemigrations --check --dry-run`: `No changes detected` (both seen 2026-11-25)
+  - `python manage.py test`: 75 tests pass (10 accounts + 65 profiles), reported by the user and confirmed by a separate run, 2026-11-25
+  - Browser check (17 checks) reported all OK by the user: field order and help text, browser blocks empty required fields, end-before-start error, add message and date line, no resubmit on refresh, current-plus-end-date error, current role listed first as "Present", confirm/unconfirm messages, saved dates in edit form, unchanged save keeps confirmation, changed save resets it with a warning, edit error then cancel, remove cancel and OK, dark mode, 404 for an unknown entry, resume still shows experience
+  - Slips fixed during the build: `AdvertForm` was deleted and then re-added indented (fixed); `experience_edit.html` was first saved with a trailing space in its name (renamed)
 
 ## Code provided, not yet verified
 
 - High-risk path: matching skipped, override button
 - Skill add and confirm flow
-- Experience page and confirm toggle
 - Delete advert
 - Sidebar restyle: New application button, dark mode toggle, user footer with sign-out icon
 - Tailored resume at `/adverts/<id>/resume/` and print to PDF
@@ -94,7 +107,7 @@ Checked the documentation against the code:
 - `SECRET_KEY` is committed in `settings.py`. Acceptable for local development only. Move to an environment variable before sharing or deploying.
 - Skills can be duplicated; no uniqueness rule
 - Skill categories limited to five fixed choices
-- No date validation on Experience or Project (end before start, current plus end date). Education has it since Feature 3; reuse that `clean()` rule as a shared helper in Feature 4.
+- No date validation on Project yet. Use `validate_date_range(self, cleaned_data, current_field="is_current")` in Feature 5.
 - Resume (Feature 12): it shows only the education end-date year and does not mark expected completion dates
 - Every skill is "Claimed"; SkillEvidence does not exist yet
 - Resume (Feature 12): it uses personal details even when `profile_confirmed` is False, and prints an empty heading if the full name is blank (possible because `get_profile()` creates profiles with a blank name)
@@ -103,7 +116,7 @@ Checked the documentation against the code:
 - LLM extraction is not built. The rule engine and fixed skill list do all the work.
 - Resume generation is built although earlier documents listed CV generation as deferred. See DECISIONS.md.
 - No Projects, Certifications or Achievements pages (dashboard shows "Coming soon")
-- No edit or remove for Experience, Skills and the other entry types (Education has both since Feature 3; personal details have edit, and no remove by decision)
+- No edit or remove for Skills and the other entry types (Education and Experience have both; personal details have edit, and no remove by decision)
 - No status history, notes, next action or reminder date on adverts (only current status and deadline)
 - No wizard, Save Draft or Review and Confirm screen
 
@@ -115,12 +128,12 @@ None. PostgreSQL must be active for Django database commands.
 
 Working one feature at a time, end to end (model → views → tests → browser check → docs → commit).
 
-Feature order: 0 Foundation (done) → 1 Accounts (done) → 2 Personal details (done) → 3 Education (done) → 4 Experience → 5 Projects → 6 Skills → 7 Certifications and Achievements → 8 Wizard and Review → 9 Advert screening → 10 Matching → 11 Tracker → 12 Resume
+Feature order: 0 Foundation (done) → 1 Accounts (done) → 2 Personal details (done) → 3 Education (done) → 4 Experience (done) → 5 Projects → 6 Skills → 7 Certifications and Achievements → 8 Wizard and Review → 9 Advert screening → 10 Matching → 11 Tracker → 12 Resume
 
-Features 0 and 1 were committed as `0e732e7` and Feature 2 as `2a7a19e`. Feature 3 is committed next (the files listed above plus the three docs; leave out `notes.txt`).
+Features 0 and 1 were committed as `0e732e7`, Feature 2 as `2a7a19e` and Feature 3 as `6802dc7`. Feature 4 is committed next (the files listed above, the new migration and template, plus the three docs; leave out `notes.txt`).
 
-Next: Feature 4, Experience. Step 1 is a read-only review of the `Experience` model, `ExperienceForm` and `/profile/experience/` against PROJECT_CONTEXT.md section 4. Look at: date validation (end before start, and "present" (`is_current`) together with an end date), pulling the Education date rule out into a shared helper, edit and remove views following the Feature 3 pattern and the reset-on-change rule, ordering of current roles, messages, and tests. The experience page was never verified in the browser.
+Next: Feature 5, Projects. Step 1 is a read-only review of the `Project` model against PROJECT_CONTEXT.md section 4. There is no Projects page yet (the dashboard card shows "Coming soon" with no URL). Look at: a `ProjectForm` with spec labels ("Project name", "Your role or contribution", "Technologies and tools", "Results or achievements", "Repository, demo or project URL", "I'm still working on this"), `validate_date_range(..., current_field="is_current")`, `DateInput(format="%Y-%m-%d")`, URL handling (the form adds `https://` when missing), `Meta.ordering` like Experience (no-op migration 0010), list/add/confirm/edit/remove views and URLs following Features 3–4, linking the dashboard card, messages, templates, and tests. The resume already reads confirmed projects; don't break it.
 
 ## Panel explanation
 
-The career profile is one record per Django user, with related entry tables in PostgreSQL. Each entry has an `is_confirmed` flag, and the system enforces its central rule: only confirmed entries are used for matching and document generation. A pasted advert is screened by plain Python rules that produce a Low, Medium or High scam-risk result with the indicators that fired. The result is a warning, not proof of fraud. High-risk adverts skip matching unless the user explicitly overrides. Otherwise the advert is compared with the user's confirmed skills to give matched skills, missing skills and a score. The user tracks the application status manually, and the system never submits anything. A tailored resume can be generated from confirmed entries only. Not built yet: LLM extraction, the guided wizard, edit/remove for most entry types (Education has them), status history, and SkillEvidence.
+The career profile is one record per Django user, with related entry tables in PostgreSQL. Each entry has an `is_confirmed` flag, and the system enforces its central rule: only confirmed entries are used for matching and document generation. A pasted advert is screened by plain Python rules that produce a Low, Medium or High scam-risk result with the indicators that fired. The result is a warning, not proof of fraud. High-risk adverts skip matching unless the user explicitly overrides. Otherwise the advert is compared with the user's confirmed skills to give matched skills, missing skills and a score. The user tracks the application status manually, and the system never submits anything. A tailored resume can be generated from confirmed entries only. Not built yet: LLM extraction, the guided wizard, edit/remove for most entry types (Education and Experience have them), status history, and SkillEvidence.

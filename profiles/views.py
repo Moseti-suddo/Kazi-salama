@@ -227,7 +227,7 @@ def skill_confirm(request, pk):
 @login_required
 def experience_list(request):
     profile = get_profile(request.user)
-    entries = Experience.objects.filter(profile=profile).order_by("-start_date")
+    entries = Experience.objects.filter(profile=profile)
 
     if request.method == "POST":
         form = ExperienceForm(request.POST)
@@ -235,6 +235,7 @@ def experience_list(request):
             entry = form.save(commit=False)
             entry.profile = profile
             entry.save()
+            messages.success(request, "Experience added.")
             return redirect("experience_list")
     else:
         form = ExperienceForm()
@@ -252,6 +253,50 @@ def experience_confirm(request, pk):
     entry = get_object_or_404(Experience, pk=pk, profile__user=request.user)
     entry.is_confirmed = not entry.is_confirmed
     entry.save(update_fields=["is_confirmed", "updated_at"])
+    if entry.is_confirmed:
+        messages.success(request, "Experience entry confirmed.")
+    else:
+        messages.info(request, "Experience entry marked unconfirmed.")
+    return redirect("experience_list")
+
+
+@login_required
+def experience_edit(request, pk):
+    entry = get_object_or_404(Experience, pk=pk, profile__user=request.user)
+    was_confirmed = entry.is_confirmed
+
+    if request.method == "POST":
+        form = ExperienceForm(request.POST, instance=entry)
+        if form.is_valid():
+            changed = form.has_changed()
+            entry = form.save(commit=False)
+            if changed:
+                entry.is_confirmed = False
+            entry.save()
+            if changed and was_confirmed:
+                messages.warning(
+                    request,
+                    "Experience updated. It changed, so please confirm it again.",
+                )
+            else:
+                messages.success(request, "Experience updated.")
+            return redirect("experience_list")
+    else:
+        form = ExperienceForm(instance=entry)
+
+    return render(
+        request,
+        "profiles/experience_edit.html",
+        {"form": form, "entry": entry},
+    )
+
+
+@login_required
+@require_POST
+def experience_delete(request, pk):
+    entry = get_object_or_404(Experience, pk=pk, profile__user=request.user)
+    entry.delete()
+    messages.success(request, "Experience entry removed.")
     return redirect("experience_list")
 
 
@@ -342,7 +387,7 @@ def advert_resume(request, pk):
 
     skills = sorted(confirmed_skills, key=lambda s: (s.name.lower() not in keywords, s.name.lower()))
     experience = sorted(
-        profile.experience_entries.filter(is_confirmed=True).order_by("-start_date"),
+        profile.experience_entries.filter(is_confirmed=True),
         key=lambda e: -_relevance(f"{e.technologies} {e.responsibilities}", keywords),
     )
     projects = sorted(
