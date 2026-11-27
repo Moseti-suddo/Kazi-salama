@@ -54,11 +54,11 @@ During the rush before the presentation the user asked for fast, multi-step code
 13. Track the application externally.
 14. Record status, deadlines, notes and next actions.
 
-Built so far: step 1, steps 4 (for personal details, Education, Experience, Projects, Skills), 5 (pasted text only), 6, 7, 8, 9, 10 (matched and missing only), 11 (score and explanation, no supporting evidence), 12, 13, and part of 14 (status and deadline).
+Built so far: step 1, steps 4 (for personal details, Education, Experience, Projects, Skills, Certifications, Achievements), 5 (pasted text only), 6, 7, 8, 9, 10 (matched and missing only), 11 (score and explanation, no supporting evidence), 12, 13, and part of 14 (status and deadline).
 
-Edit and remove exist for personal details (edit only), Education, Experience and Projects.
+Edit and remove exist for personal details (edit only), Education, Experience, Projects, Skills, Certifications and Achievements.
 
-Not built: wizard, Save Draft, review screen, URL submission, partial matches, supporting evidence, notes form, next action, reminder date, status history.
+Not built: wizard, Save Draft, review screen, URL submission, partial matches, supporting profile evidence in match results (skills can be linked to supporting entries, but matching does not use the links yet), certifications and achievements on the resume, notes form, next action, reminder date, status history.
 
 ## 4. Career Profile Sections
 
@@ -141,6 +141,8 @@ Each skill should be one of:
 - Supported: linked to education, experience or projects
 
 Supported means the profile contains evidence, not that the user is an expert.
+
+Built: a skill links to Education, Experience and Project entries through three ManyToMany fields. It shows Supported only while at least one linked entry is confirmed, otherwise Claimed.
 
 ### Certifications and courses
 
@@ -304,14 +306,14 @@ Profiles app files:
 - `profiles/models.py`, `forms.py`, `views.py`, `urls.py`, `admin.py`
 - `profiles/scam.py` (scam rules)
 - `profiles/matching.py` (skill matching)
-- `profiles/tests.py` (90 tests: 5 scam/matching, 17 profile page, 20 education page, 23 experience page, 25 project page)
-- `profiles/migrations/0001` to `0010` (0008, 0009 and 0010 change Education, Experience and Project ordering only and run no SQL)
+- `profiles/tests.py` (146 tests: 5 scam/matching, 17 profile page, 20 education page, 23 experience page, 25 project page, 24 skill page, 17 certification page, 15 achievement page)
+- `profiles/migrations/0001` to `0011` (0008, 0009 and 0010 change Education, Experience and Project ordering only and run no SQL; 0011 adds the three skill-evidence join tables and sets Certification and Achievement ordering)
 
 Templates (Django searches both folders: `DIRS` and `APP_DIRS`):
 
 - `templates/base.html`
 - `templates/registration/login.html`
-- `templates/profiles/profile_edit.html`, `dashboard.html`, `education_list.html`, `education_edit.html`, `skill_list.html`, `experience_list.html`, `experience_edit.html`, `project_list.html`, `project_edit.html`
+- `templates/profiles/profile_edit.html`, `dashboard.html`, `education_list.html`, `education_edit.html`, `skill_list.html`, `skill_edit.html`, `experience_list.html`, `experience_edit.html`, `project_list.html`, `project_edit.html`, `certification_list.html`, `certification_edit.html`, `achievement_list.html`, `achievement_edit.html`
 - `templates/profiles/advert_list.html`, `advert_detail.html`, `resume.html`
 - All templates now live under `templates/`. `profile_edit.html` was moved there from `profiles/templates/profiles/` in Feature 2.
 - `base.html` shows Django messages (success, info, warning, error) above every page's content.
@@ -400,6 +402,10 @@ Working browser routes:
 - `/profile/education/<id>/edit/` — edit an education entry (a change makes it unconfirmed)
 - `/profile/education/<id>/delete/` — POST, remove an education entry
 - `/profile/skills/` — list, add and confirm skills
+- `/profile/skills/<id>/edit/` — edit a skill and its supporting links (a change makes it unconfirmed)
+- `/profile/skills/<id>/delete/` — POST, remove a skill
+- `/profile/certifications/` — list, add and confirm certifications; `<id>/confirm/`, `<id>/edit/`, `<id>/delete/` as for projects
+- `/profile/achievements/` — list, add and confirm achievements; `<id>/confirm/`, `<id>/edit/`, `<id>/delete/` as for projects
 - `/profile/experience/` — list, add and confirm experience
 - `/profile/experience/<id>/edit/` — edit an experience entry (a change makes it unconfirmed)
 - `/profile/experience/<id>/delete/` — POST, remove an experience entry
@@ -413,7 +419,7 @@ Working browser routes:
 - `/adverts/<id>/delete/` — POST, delete advert
 - `/adverts/<id>/resume/` — tailored resume (only after matching)
 
-Provided but not yet verified in the browser: skill add, delete advert, sidebar restyle and dark mode, resume page.
+Provided but not yet verified in the browser: delete advert, sidebar restyle and dark mode, resume page.
 
 
 The next implementation step is in PROJECT_STATUS.md.

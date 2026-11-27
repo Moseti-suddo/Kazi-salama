@@ -1,6 +1,15 @@
 import re
 from django import forms
-from .models import Advert, CareerProfile, Education, Experience, Skill, Project
+from .models import (
+    Achievement,
+    Advert,
+    CareerProfile,
+    Certification,
+    Education,
+    Experience,
+    Project,
+    Skill,
+)
 
 def validate_date_range(form, cleaned_data, current_field=None):
     start = cleaned_data.get("start_date")
@@ -76,12 +85,63 @@ class EducationForm(forms.ModelForm):
         return cleaned_data
 
 class SkillForm(forms.ModelForm):
+    supporting_education = forms.ModelMultipleChoiceField(
+        queryset=Education.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Supporting education",
+    )
+    supporting_experience = forms.ModelMultipleChoiceField(
+        queryset=Experience.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Supporting experience",
+    )
+    supporting_projects = forms.ModelMultipleChoiceField(
+        queryset=Project.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Supporting projects",
+    )
+
     class Meta:
         model = Skill
-        fields = ["name", "category", "proficiency", "notes"]
+        fields = [
+            "name",
+            "category",
+            "proficiency",
+            "supporting_education",
+            "supporting_experience",
+            "supporting_projects",
+            "notes",
+        ]
+        labels = {
+            "name": "Skill name",
+            "proficiency": "Self-assessed proficiency",
+        }
+        help_texts = {
+            "name": "e.g. Python, Django, Teamwork.",
+            "proficiency": "Optional. Your own view of your level.",
+            "notes": "Optional.",
+        }
         widgets = {
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
+
+    def __init__(self, *args, profile, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.profile = profile
+        self.fields["supporting_education"].queryset = profile.education_entries.all()
+        self.fields["supporting_experience"].queryset = profile.experience_entries.all()
+        self.fields["supporting_projects"].queryset = profile.project_entries.all()
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        duplicates = self.profile.skills.filter(name__iexact=name)
+        if self.instance.pk:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        if duplicates.exists():
+            raise forms.ValidationError("You already have a skill with this name.")
+        return name
 
 class ExperienceForm(forms.ModelForm):
     class Meta:
@@ -164,6 +224,66 @@ class ProjectForm(forms.ModelForm):
         cleaned_data = super().clean()
         validate_date_range(self, cleaned_data, current_field="is_current")
         return cleaned_data
+
+class CertificationForm(forms.ModelForm):
+    class Meta:
+        model = Certification
+        fields = [
+            "name",
+            "provider",
+            "issue_date",
+            "expiry_date",
+            "url",
+            "description",
+        ]
+        labels = {
+            "name": "Certification or course name",
+            "issue_date": "Issue or completion date",
+            "url": "Verification URL",
+            "description": "Description or topics",
+        }
+        help_texts = {
+            "provider": "e.g. Coursera, Cisco, Google.",
+            "expiry_date": "Optional. Leave blank if it does not expire.",
+            "url": "Optional. A link where someone can verify it.",
+            "description": "Optional. Topics covered.",
+        }
+        widgets = {
+            "issue_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "expiry_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        issued = cleaned_data.get("issue_date")
+        expiry = cleaned_data.get("expiry_date")
+        if issued and expiry and expiry < issued:
+            self.add_error("expiry_date", "Expiry date cannot be before the issue date.")
+        return cleaned_data
+
+
+class AchievementForm(forms.ModelForm):
+    class Meta:
+        model = Achievement
+        fields = ["title", "issuer", "date", "description", "url"]
+        labels = {
+            "issuer": "Issuing organisation",
+            "url": "Evidence URL",
+        }
+        help_texts = {
+            "issuer": "Who gave you the award or recognition.",
+            "description": "Optional.",
+            "url": "Optional. A link to evidence, e.g. a certificate or news article.",
+        }
+        widgets = {
+            "date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["date"].required = True
 
 
 class AdvertForm(forms.ModelForm):

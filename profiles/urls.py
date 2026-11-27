@@ -23,6 +23,16 @@ from .views import (
     project_delete,
     project_edit,
     project_list,
+    skill_edit,
+    skill_delete,
+    certification_list,
+    certification_confirm,
+    certification_edit,
+    certification_delete,
+    achievement_list,
+    achievement_confirm,
+    achievement_edit,
+    achievement_delete,
 )
 
 urlpatterns = [
@@ -49,4 +59,14 @@ urlpatterns = [
     path("profile/projects/<int:pk>/confirm/", project_confirm, name="project_confirm"),
     path("profile/projects/<int:pk>/edit/", project_edit, name="project_edit"),
     path("profile/projects/<int:pk>/delete/", project_delete, name="project_delete"),
+    path("profile/skills/<int:pk>/edit/", skill_edit, name="skill_edit"),
+    path("profile/skills/<int:pk>/delete/", skill_delete, name="skill_delete"),
+    path("profile/certifications/", certification_list, name="certification_list"),
+    path("profile/certifications/<int:pk>/confirm/", certification_confirm, name="certification_confirm"),
+    path("profile/certifications/<int:pk>/edit/", certification_edit, name="certification_edit"),
+    path("profile/certifications/<int:pk>/delete/", certification_delete, name="certification_delete"),
+    path("profile/achievements/", achievement_list, name="achievement_list"),
+    path("profile/achievements/<int:pk>/confirm/", achievement_confirm, name="achievement_confirm"),
+    path("profile/achievements/<int:pk>/edit/", achievement_edit, name="achievement_edit"),
+    path("profile/achievements/<int:pk>/delete/", achievement_delete, name="achievement_delete"),
 ]

@@ -1,6 +1,6 @@
 # Kazi Salama — Project Status
 
-Last updated: 2026-11-25
+Last updated: 2026-11-27
 
 ## Current phase
 
@@ -94,10 +94,21 @@ Core demo flow built: profile entries, confirmation, advert screening, skill mat
   - Browser check (15 checks) reported all passing by the user: sidebar and single dashboard card, field order and help text, browser blocks empty required fields, end-before-start error, current-plus-end-date error, add message and `https://` link in a new tab, no resubmit on refresh, current project first as "Present", confirm/unconfirm messages, saved dates in edit form, unchanged save keeps confirmation, changed save resets it with a warning, remove cancel and OK, dark mode, 404 for an unknown entry, confirmed project on the resume
   - Slips fixed during the build: the dashboard got a second Projects card because the new tuple was appended instead of replacing the old `None` one (old line removed); the sidebar link was first placed after Adverts (moved)
 
+- Features 6 and 7 (skills, certifications, achievements), 2026-11-27, done together by user request:
+  - `profiles/models.py`: `Skill` gains three ManyToMany fields, `supporting_education`, `supporting_experience`, `supporting_projects` (all `related_name="supported_skills"`), and an `is_supported` property that is true only when a linked entry is confirmed. `Certification.Meta.ordering` is `-issue_date`, `-created_at`. `Achievement.Meta.ordering` is date newest first with undated entries last, then `-created_at`
+  - `profiles/migrations/0011_alter_achievement_options_and_more.py`: three new join tables plus two no-op ordering changes. Applied (`showmigrations` shows `[X]`); `makemigrations --check --dry-run`: `No changes detected` (both seen 2026-11-27)
+  - `profiles/forms.py`: `SkillForm` now takes `profile=` (scopes the evidence checkboxes to the user's own entries and makes the duplicate check per user), rejects duplicate names ignoring case (own entry excluded on edit), trims the name, spec labels and help text. New `CertificationForm` (expiry before issue date rejected, error on `expiry_date`) and `AchievementForm` (`date` required in `__init__`, form-level only)
+  - `profiles/views.py`: new `skill_edit`, `skill_delete`; `skill_list` and `skill_confirm` gain messages and `form.save_m2m()`; new `certification_*` and `achievement_*` views (list/add, confirm, edit, delete) following the Projects pattern; dashboard cards now link to them. All look up entries with `profile__user=request.user`; a changed edit, including changed links only, resets `is_confirmed`
+  - `profiles/urls.py`: `/profile/skills/<pk>/edit/` and `/delete/`, `/profile/certifications/` and `/profile/achievements/` with `/<pk>/confirm/`, `/edit/`, `/delete/`
+  - Templates: `skill_list.html` rewritten (Supported or Claimed badge, linked entries, Edit, Remove); new `skill_edit.html`, `certification_list.html`, `certification_edit.html`, `achievement_list.html`, `achievement_edit.html`; `base.html` sidebar links for Certifications and Achievements
+  - `profiles/tests.py`: 56 new tests: 24 `SkillPageTests`, 17 `CertificationPageTests`, 15 `AchievementPageTests`
+  - `python manage.py test`: 156 tests pass (10 accounts + 146 profiles), run and seen 2026-11-27
+  - Browser check (16 checks) reported all passing by the user: sidebar and dashboard links, evidence checkbox labels, Supported flipping to Claimed when a linked project is unconfirmed, duplicate error, edit pre-fill and confirmation reset (including a links-only change), remove cancel and OK, dark mode, certification expiry error and date line, required fields, newest-first ordering, achievement required date, 404 for unknown entries, matching still works with a confirmed skill
+  - Slips fixed during the build: `SkillForm` first used `profile.projects`, but the real related name is `project_entries` (found by reading `models.py`; `manage.py check` could not catch it because the lookup runs only when the form is created)
+
 ## Code provided, not yet verified
 
 - High-risk path: matching skipped, override button
-- Skill add and confirm flow
 - Delete advert
 - Sidebar restyle: New application button, dark mode toggle, user footer with sign-out icon
 - Tailored resume at `/adverts/<id>/resume/` and print to PDF
@@ -121,19 +132,22 @@ Checked the documentation against the code:
 - Always run `source .venv/bin/activate` first. The system Python has Django 5.2.17, which created the faulty migration 0006. Check that the prompt shows `(.venv)`.
 - `MAILERS` in `settings.py`: earlier notes called it "not a Django setting", but the comment above it links to the Django 6.1 email docs and the venv runs 6.1.3, so it may be the real 6.1 setting. Not verified yet. Check before changing it, when password-reset email comes up.
 - `SECRET_KEY` is committed in `settings.py`. Acceptable for local development only. Move to an environment variable before sharing or deploying.
-- Skills can be duplicated; no uniqueness rule
+- Skill duplicates are rejected in the form only (ignoring case, per user). There is no database constraint, so Django Admin can still create duplicates.
 - Skill categories limited to five fixed choices
+- A skill linked to an entry stays linked if the entry is later unconfirmed, but it then shows "Claimed" until the entry is confirmed again. Deleting a linked entry removes the link silently.
+- Supporting links are not used by matching or the resume yet. They only drive the Supported or Claimed badge.
+- Achievement `date` is required in the form but not the model, so an old undated row can exist and must get a date when edited
+- Certification expiry is stored and shown, but nothing warns about an expired certification
 - Resume (Feature 12): projects show only name, role, description and technologies; outcomes, URL and dates are left out
 - Django Admin registers only `CareerProfile`; Education, Experience, Projects and the other entry types are not in Admin
 - Resume (Feature 12): it shows only the education end-date year and does not mark expected completion dates
-- Every skill is "Claimed"; SkillEvidence does not exist yet
 - Resume (Feature 12): it uses personal details even when `profile_confirmed` is False, and prints an empty heading if the full name is blank (possible because `get_profile()` creates profiles with a blank name)
 - Scam rule weights and thresholds are starting values. They have not been validated against real adverts.
 - Matching only recognises the fixed `KNOWN_SKILLS` list plus the user's confirmed skills. Unusual skills in an advert are missed. No partial-match category yet.
 - LLM extraction is not built. The rule engine and fixed skill list do all the work.
 - Resume generation is built although earlier documents listed CV generation as deferred. See DECISIONS.md.
-- No Certifications or Achievements pages (dashboard shows "Coming soon")
-- No edit or remove for Skills, Certifications and Achievements (Education, Experience and Projects have both; personal details have edit, and no remove by decision)
+- Certifications and Achievements are not shown on the resume and are not used by matching
+- Edit and remove exist for every profile entry type; personal details have edit only, by decision
 - No status history, notes, next action or reminder date on adverts (only current status and deadline)
 - No wizard, Save Draft or Review and Confirm screen
 
@@ -145,12 +159,12 @@ None. PostgreSQL must be active for Django database commands.
 
 Working one feature at a time, end to end (model → views → tests → browser check → docs → commit).
 
-Feature order: 0 Foundation (done) → 1 Accounts (done) → 2 Personal details (done) → 3 Education (done) → 4 Experience (done) → 5 Projects (done) → 6 Skills → 7 Certifications and Achievements → 8 Wizard and Review → 9 Advert screening → 10 Matching → 11 Tracker → 12 Resume
+Feature order: 0 Foundation (done) → 1 Accounts (done) → 2 Personal details (done) → 3 Education (done) → 4 Experience (done) → 5 Projects (done) → 6 Skills (done) → 7 Certifications and Achievements (done) → 8 Wizard and Review → 9 Advert screening → 10 Matching → 11 Tracker → 12 Resume
 
-Features 0 and 1 were committed as `0e732e7`, Feature 2 as `2a7a19e`, Feature 3 as `6802dc7` and Feature 4 as `bab2493`. Feature 5 is committed next (the files listed above, migration 0010, the two new templates, plus the three docs; leave out `notes.txt`).
+Features 0 and 1 were committed as `0e732e7`, Feature 2 as `2a7a19e`, Feature 3 as `6802dc7` and Feature 4 as `bab2493` and Feature 5 as `0b7c230`. Features 6 and 7 are not committed yet. The commit should hold the modified `forms.py`, `models.py`, `tests.py`, `urls.py`, `views.py`, `base.html`, `skill_list.html`, migration 0011, the five new templates and the three docs; leave out `notes.txt`.
 
-Next: Feature 6, Skills. Step 1 is a read-only review of the `Skill` model, `SkillForm`, `skill_list`/`skill_confirm` and `skill_list.html` against PROJECT_CONTEXT.md section 4 (Skills: name, category, optional proficiency, supporting profile-entry links, notes; Claimed vs Supported). Known gaps to decide on: no edit or remove, duplicate skills allowed, five fixed categories, every skill "Claimed" because SkillEvidence does not exist. Matching and the resume read confirmed skills; don't break them.
+Next: Feature 8, Wizard and Review. Step 1 is a read-only review of what exists (the entry pages, the dashboard counts, the confirm toggles) against PROJECT_CONTEXT.md section 5 (multi-step wizard with Next, Back and Save Draft; allow incomplete drafts; a final Review and Confirm screen; confirm entries individually). Decide first how a draft differs from an unconfirmed entry, since entries already save as unconfirmed. HTMX and Tailwind stay deferred unless this step needs them. Do not start GitHub evidence, CV extraction, ad collection or the daily agent before this is done.
 
 ## Panel explanation
 
-The career profile is one record per Django user, with related entry tables in PostgreSQL. Each entry has an `is_confirmed` flag, and the system enforces its central rule: only confirmed entries are used for matching and document generation. A pasted advert is screened by plain Python rules that produce a Low, Medium or High scam-risk result with the indicators that fired. The result is a warning, not proof of fraud. High-risk adverts skip matching unless the user explicitly overrides. Otherwise the advert is compared with the user's confirmed skills to give matched skills, missing skills and a score. The user tracks the application status manually, and the system never submits anything. A tailored resume can be generated from confirmed entries only. Not built yet: LLM extraction, the guided wizard, edit/remove for Skills, Certifications and Achievements (Education, Experience and Projects have them), status history, and SkillEvidence.
+The career profile is one record per Django user, with related entry tables in PostgreSQL. Each entry has an `is_confirmed` flag, and the system enforces its central rule: only confirmed entries are used for matching and document generation. A pasted advert is screened by plain Python rules that produce a Low, Medium or High scam-risk result with the indicators that fired. The result is a warning, not proof of fraud. High-risk adverts skip matching unless the user explicitly overrides. Otherwise the advert is compared with the user's confirmed skills to give matched skills, missing skills and a score. The user tracks the application status manually, and the system never submits anything. A tailored resume can be generated from confirmed entries only. Skills can be linked to the confirmed education, experience and projects that support them, which marks them Supported rather than Claimed. Not built yet: LLM extraction, the guided wizard and Review screen, status history, using skill evidence in matching, and certifications or achievements on the resume.

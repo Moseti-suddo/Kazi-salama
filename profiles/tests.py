@@ -5,7 +5,16 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import CareerProfile, Education, Experience, Project
+from .models import (
+    Achievement,
+    CareerProfile,
+    Certification,
+    Education,
+    Experience,
+    Project,
+    Skill,
+)
+
 from .matching import match_skills
 from .scam import screen_advert
 
@@ -844,3 +853,536 @@ class ProjectPageTests(TestCase):
         self.assertEqual(response.status_code, 404)
         entry.refresh_from_db()
         self.assertFalse(entry.is_confirmed)
+
+class SkillPageTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("amina", "amina@example.com", PASSWORD)
+        self.client.force_login(self.user)
+        self.profile = CareerProfile.objects.create(user=self.user, full_name="Amina Otieno")
+        self.url = reverse("skill_list")
+
+    def valid_data(self, **overrides):
+        data = {
+            "name": "Python",
+            "category": Skill.Category.LANGUAGE,
+            "proficiency": "",
+            "notes": "",
+        }
+        data.update(overrides)
+        return data
+
+    def make_skill(self, profile=None, **overrides):
+        fields = {"name": "Python", "category": Skill.Category.LANGUAGE}
+        fields.update(overrides)
+        return Skill.objects.create(profile=profile or self.profile, **fields)
+
+    def make_education(self, profile=None, **overrides):
+        fields = {"institution": "UoN", "qualification": "BSc", "field_of_study": "CS"}
+        fields.update(overrides)
+        return Education.objects.create(profile=profile or self.profile, **fields)
+
+    def make_project(self, profile=None, **overrides):
+        fields = {
+            "name": "Kazi",
+            "description": "d",
+            "role": "r",
+            "technologies": "Python",
+        }
+        fields.update(overrides)
+        return Project.objects.create(profile=profile or self.profile, **fields)
+
+    def other_profile(self):
+        other = User.objects.create_user("bob", "bob@example.com", PASSWORD)
+        return CareerProfile.objects.create(user=other, full_name="Bob")
+
+    # --- access and adding ---
+
+    def test_login_required(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertRedirects(response, f"{reverse('login')}?next={self.url}")
+
+    def test_add_skill(self):
+        response = self.client.post(self.url, self.valid_data(), follow=True)
+        self.assertRedirects(response, self.url)
+        self.assertContains(response, "Skill added.")
+        skill = Skill.objects.get()
+        self.assertEqual(skill.profile, self.profile)
+        self.assertFalse(skill.is_confirmed)
+
+    def test_required_fields(self):
+        for field in ["name", "category"]:
+            with self.subTest(field=field):
+                response = self.client.post(self.url, self.valid_data(**{field: ""}))
+                self.assertEqual(response.status_code, 200)
+                self.assertFormError(response.context["form"], field, "This field is required.")
+        self.assertEqual(Skill.objects.count(), 0)
+
+    def test_name_is_trimmed(self):
+        self.client.post(self.url, self.valid_data(name="  Python  "))
+        self.assertEqual(Skill.objects.get().name, "Python")
+
+    # --- duplicates ---
+
+    def test_duplicate_name_rejected_ignoring_case(self):
+        self.make_skill(name="Python")
+        response = self.client.post(self.url, self.valid_data(name="python"))
+        self.assertFormError(
+            response.context["form"], "name", "You already have a skill with this name."
+        )
+        self.assertEqual(Skill.objects.count(), 1)
+
+    def test_same_name_allowed_for_another_user(self):
+        self.make_skill(profile=self.other_profile(), name="Python")
+        self.client.post(self.url, self.valid_data(name="Python"))
+        self.assertEqual(Skill.objects.filter(profile=self.profile).count(), 1)
+
+    def test_edit_to_another_existing_name_rejected(self):
+        self.make_skill(name="Python")
+        skill = self.make_skill(name="Django", category=Skill.Category.FRAMEWORK)
+        response = self.client.post(
+            reverse("skill_edit", args=[skill.pk]),
+            self.valid_data(name="PYTHON", category=Skill.Category.FRAMEWORK),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("name", response.context["form"].errors)
+        skill.refresh_from_db()
+        self.assertEqual(skill.name, "Django")
+
+    def test_edit_keeping_own_name_is_not_a_duplicate(self):
+        skill = self.make_skill(name="Python")
+        response = self.client.post(
+            reverse("skill_edit", args=[skill.pk]), self.valid_data(notes="Used daily")
+        )
+        self.assertRedirects(response, self.url)
+        skill.refresh_from_db()
+        self.assertEqual(skill.notes, "Used daily")
+
+    # --- supporting evidence ---
+
+    def test_add_with_supporting_entries(self):
+        edu = self.make_education()
+        proj = self.make_project()
+        self.client.post(
+            self.url,
+            self.valid_data(supporting_education=[edu.pk], supporting_projects=[proj.pk]),
+        )
+        skill = Skill.objects.get()
+        self.assertEqual(list(skill.supporting_education.all()), [edu])
+        self.assertEqual(list(skill.supporting_projects.all()), [proj])
+
+    def test_cannot_link_another_users_entry(self):
+        other_edu = self.make_education(profile=self.other_profile())
+        response = self.client.post(
+            self.url, self.valid_data(supporting_education=[other_edu.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("supporting_education", response.context["form"].errors)
+        self.assertEqual(Skill.objects.count(), 0)
+
+    def test_claimed_without_links(self):
+        self.assertFalse(self.make_skill().is_supported)
+
+    def test_unconfirmed_link_does_not_support(self):
+        skill = self.make_skill()
+        skill.supporting_projects.add(self.make_project(is_confirmed=False))
+        self.assertFalse(skill.is_supported)
+
+    def test_confirmed_link_supports(self):
+        skill = self.make_skill()
+        skill.supporting_projects.add(self.make_project(is_confirmed=True))
+        self.assertTrue(skill.is_supported)
+
+    def test_list_shows_claimed_and_supported(self):
+        self.make_skill(name="Claimed one", category=Skill.Category.TOOL)
+        supported = self.make_skill(name="Supported one")
+        supported.supporting_projects.add(self.make_project(is_confirmed=True))
+        response = self.client.get(self.url)
+        self.assertContains(response, "Claimed")
+        self.assertContains(response, "Supported")
+
+    # --- confirm, edit, remove ---
+
+    def test_confirm_toggle(self):
+        skill = self.make_skill()
+        url = reverse("skill_confirm", args=[skill.pk])
+        response = self.client.post(url, follow=True)
+        self.assertContains(response, "Skill confirmed.")
+        skill.refresh_from_db()
+        self.assertTrue(skill.is_confirmed)
+        response = self.client.post(url, follow=True)
+        self.assertContains(response, "Skill marked unconfirmed.")
+
+    def test_confirm_requires_post(self):
+        skill = self.make_skill()
+        response = self.client.get(reverse("skill_confirm", args=[skill.pk]))
+        self.assertEqual(response.status_code, 405)
+
+    def test_edit_form_shows_saved_values(self):
+        skill = self.make_skill(proficiency=Skill.Proficiency.ADVANCED)
+        response = self.client.get(reverse("skill_edit", args=[skill.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["form"].initial["proficiency"], "advanced")
+
+    def test_unchanged_save_keeps_confirmation(self):
+        skill = self.make_skill(is_confirmed=True)
+        response = self.client.post(
+            reverse("skill_edit", args=[skill.pk]), self.valid_data(), follow=True
+        )
+        self.assertContains(response, "Skill updated.")
+        skill.refresh_from_db()
+        self.assertTrue(skill.is_confirmed)
+
+    def test_changed_save_resets_confirmation(self):
+        skill = self.make_skill(is_confirmed=True)
+        response = self.client.post(
+            reverse("skill_edit", args=[skill.pk]),
+            self.valid_data(proficiency=Skill.Proficiency.EXPERT),
+            follow=True,
+        )
+        self.assertContains(response, "please confirm it again")
+        skill.refresh_from_db()
+        self.assertFalse(skill.is_confirmed)
+
+    def test_changing_only_links_resets_confirmation(self):
+        skill = self.make_skill(is_confirmed=True)
+        proj = self.make_project()
+        self.client.post(
+            reverse("skill_edit", args=[skill.pk]),
+            self.valid_data(supporting_projects=[proj.pk]),
+        )
+        skill.refresh_from_db()
+        self.assertFalse(skill.is_confirmed)
+        self.assertEqual(list(skill.supporting_projects.all()), [proj])
+
+    def test_delete_skill(self):
+        skill = self.make_skill()
+        response = self.client.post(reverse("skill_delete", args=[skill.pk]), follow=True)
+        self.assertContains(response, "Skill removed.")
+        self.assertEqual(Skill.objects.count(), 0)
+
+    def test_delete_requires_post(self):
+        skill = self.make_skill()
+        response = self.client.get(reverse("skill_delete", args=[skill.pk]))
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(Skill.objects.count(), 1)
+
+    def test_deleting_linked_entry_keeps_skill(self):
+        skill = self.make_skill()
+        proj = self.make_project(is_confirmed=True)
+        skill.supporting_projects.add(proj)
+        proj.delete()
+        skill.refresh_from_db()
+        self.assertFalse(skill.is_supported)
+
+    def test_other_users_skill_is_404(self):
+        skill = self.make_skill(profile=self.other_profile(), name="Secret")
+        for name, method in [
+            ("skill_edit", self.client.get),
+            ("skill_edit", self.client.post),
+            ("skill_confirm", self.client.post),
+            ("skill_delete", self.client.post),
+        ]:
+            with self.subTest(view=name, method=method.__name__):
+                self.assertEqual(method(reverse(name, args=[skill.pk])).status_code, 404)
+        self.assertEqual(Skill.objects.count(), 1)
+
+
+class CertificationPageTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("amina", "amina@example.com", PASSWORD)
+        self.client.force_login(self.user)
+        self.profile = CareerProfile.objects.create(user=self.user, full_name="Amina Otieno")
+        self.url = reverse("certification_list")
+
+    def valid_data(self, **overrides):
+        data = {
+            "name": "Google Data Analytics",
+            "provider": "Coursera",
+            "issue_date": "2026-03-15",
+            "expiry_date": "",
+            "url": "https://coursera.org/verify/abc",
+            "description": "SQL, R and Tableau.",
+        }
+        data.update(overrides)
+        return data
+
+    def make_entry(self, profile=None, **overrides):
+        fields = {
+            "name": "Google Data Analytics",
+            "provider": "Coursera",
+            "issue_date": date(2026, 3, 15),
+        }
+        fields.update(overrides)
+        return Certification.objects.create(profile=profile or self.profile, **fields)
+
+    def other_entry(self):
+        other = User.objects.create_user("bob", "bob@example.com", PASSWORD)
+        other_profile = CareerProfile.objects.create(user=other, full_name="Bob")
+        return self.make_entry(profile=other_profile, name="Bob's cert")
+
+    def test_login_required(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertRedirects(response, f"{reverse('login')}?next={self.url}")
+
+    def test_add_entry(self):
+        response = self.client.post(self.url, self.valid_data(), follow=True)
+        self.assertRedirects(response, self.url)
+        self.assertContains(response, "Certification added.")
+        entry = Certification.objects.get()
+        self.assertEqual(entry.profile, self.profile)
+        self.assertEqual(entry.issue_date, date(2026, 3, 15))
+        self.assertFalse(entry.is_confirmed)
+
+    def test_required_fields(self):
+        for field in ["name", "provider", "issue_date"]:
+            with self.subTest(field=field):
+                response = self.client.post(self.url, self.valid_data(**{field: ""}))
+                self.assertEqual(response.status_code, 200)
+                self.assertFormError(response.context["form"], field, "This field is required.")
+        self.assertEqual(Certification.objects.count(), 0)
+
+    def test_optional_fields_blank(self):
+        self.client.post(self.url, self.valid_data(url="", description=""))
+        entry = Certification.objects.get()
+        self.assertIsNone(entry.expiry_date)
+        self.assertEqual(entry.url, "")
+
+    def test_invalid_url_rejected(self):
+        response = self.client.post(self.url, self.valid_data(url="not a url"))
+        self.assertIn("url", response.context["form"].errors)
+        self.assertEqual(Certification.objects.count(), 0)
+
+    def test_expiry_before_issue_rejected(self):
+        response = self.client.post(
+            self.url, self.valid_data(issue_date="2026-03-15", expiry_date="2026-01-01")
+        )
+        self.assertFormError(
+            response.context["form"],
+            "expiry_date",
+            "Expiry date cannot be before the issue date.",
+        )
+        self.assertEqual(Certification.objects.count(), 0)
+
+    def test_equal_issue_and_expiry_allowed(self):
+        self.client.post(
+            self.url, self.valid_data(issue_date="2026-03-15", expiry_date="2026-03-15")
+        )
+        self.assertEqual(Certification.objects.count(), 1)
+
+    def test_newest_issue_date_first(self):
+        self.make_entry(name="Old", issue_date=date(2024, 1, 1))
+        self.make_entry(name="New", issue_date=date(2026, 1, 1))
+        response = self.client.get(self.url)
+        self.assertEqual([e.name for e in response.context["entries"]], ["New", "Old"])
+
+    def test_list_shows_only_own_entries(self):
+        self.make_entry(name="Mine")
+        self.other_entry()
+        response = self.client.get(self.url)
+        self.assertContains(response, "Mine")
+        self.assertNotContains(response, "Bob&#x27;s cert")
+
+    def test_confirm_toggle(self):
+        entry = self.make_entry()
+        url = reverse("certification_confirm", args=[entry.pk])
+        response = self.client.post(url, follow=True)
+        self.assertContains(response, "Certification confirmed.")
+        entry.refresh_from_db()
+        self.assertTrue(entry.is_confirmed)
+        response = self.client.post(url, follow=True)
+        self.assertContains(response, "Certification marked unconfirmed.")
+
+    def test_edit_form_shows_saved_dates(self):
+        entry = self.make_entry(expiry_date=date(2029, 3, 15))
+        response = self.client.get(reverse("certification_edit", args=[entry.pk]))
+        self.assertContains(response, 'value="2026-03-15"')
+        self.assertContains(response, 'value="2029-03-15"')
+
+    def test_unchanged_save_keeps_confirmation(self):
+        entry = self.make_entry(
+            is_confirmed=True, url="https://coursera.org/verify/abc", description="SQL, R and Tableau."
+        )
+        self.client.post(reverse("certification_edit", args=[entry.pk]), self.valid_data())
+        entry.refresh_from_db()
+        self.assertTrue(entry.is_confirmed)
+
+    def test_changed_save_resets_confirmation(self):
+        entry = self.make_entry(is_confirmed=True)
+        response = self.client.post(
+            reverse("certification_edit", args=[entry.pk]),
+            self.valid_data(provider="edX"),
+            follow=True,
+        )
+        self.assertContains(response, "please confirm it again")
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_confirmed)
+        self.assertEqual(entry.provider, "edX")
+
+    def test_delete_entry(self):
+        entry = self.make_entry()
+        response = self.client.post(reverse("certification_delete", args=[entry.pk]), follow=True)
+        self.assertContains(response, "Certification removed.")
+        self.assertEqual(Certification.objects.count(), 0)
+
+    def test_delete_requires_post(self):
+        entry = self.make_entry()
+        response = self.client.get(reverse("certification_delete", args=[entry.pk]))
+        self.assertEqual(response.status_code, 405)
+
+    def test_other_users_entry_is_404(self):
+        entry = self.other_entry()
+        for name, method in [
+            ("certification_edit", self.client.get),
+            ("certification_edit", self.client.post),
+            ("certification_confirm", self.client.post),
+            ("certification_delete", self.client.post),
+        ]:
+            with self.subTest(view=name, method=method.__name__):
+                self.assertEqual(method(reverse(name, args=[entry.pk])).status_code, 404)
+        self.assertEqual(Certification.objects.count(), 1)
+
+    def test_dashboard_links_to_page(self):
+        response = self.client.get(reverse("dashboard"))
+        self.assertContains(response, self.url)
+
+
+class AchievementPageTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("amina", "amina@example.com", PASSWORD)
+        self.client.force_login(self.user)
+        self.profile = CareerProfile.objects.create(user=self.user, full_name="Amina Otieno")
+        self.url = reverse("achievement_list")
+
+    def valid_data(self, **overrides):
+        data = {
+            "title": "Dean's List",
+            "issuer": "University of Nairobi",
+            "date": "2026-06-30",
+            "description": "Top 5% of the class.",
+            "url": "",
+        }
+        data.update(overrides)
+        return data
+
+    def make_entry(self, profile=None, **overrides):
+        fields = {
+            "title": "Dean's List",
+            "issuer": "University of Nairobi",
+            "date": date(2026, 6, 30),
+        }
+        fields.update(overrides)
+        return Achievement.objects.create(profile=profile or self.profile, **fields)
+
+    def other_entry(self):
+        other = User.objects.create_user("bob", "bob@example.com", PASSWORD)
+        other_profile = CareerProfile.objects.create(user=other, full_name="Bob")
+        return self.make_entry(profile=other_profile, title="Bob's award")
+
+    def test_login_required(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertRedirects(response, f"{reverse('login')}?next={self.url}")
+
+    def test_add_entry(self):
+        response = self.client.post(self.url, self.valid_data(), follow=True)
+        self.assertRedirects(response, self.url)
+        self.assertContains(response, "Achievement added.")
+        entry = Achievement.objects.get()
+        self.assertEqual(entry.profile, self.profile)
+        self.assertEqual(entry.date, date(2026, 6, 30))
+        self.assertFalse(entry.is_confirmed)
+
+    def test_required_fields_including_date(self):
+        for field in ["title", "issuer", "date"]:
+            with self.subTest(field=field):
+                response = self.client.post(self.url, self.valid_data(**{field: ""}))
+                self.assertEqual(response.status_code, 200)
+                self.assertFormError(response.context["form"], field, "This field is required.")
+        self.assertEqual(Achievement.objects.count(), 0)
+
+    def test_optional_fields_blank(self):
+        self.client.post(self.url, self.valid_data(description="", url=""))
+        entry = Achievement.objects.get()
+        self.assertEqual(entry.description, "")
+        self.assertEqual(entry.url, "")
+
+    def test_invalid_url_rejected(self):
+        response = self.client.post(self.url, self.valid_data(url="not a url"))
+        self.assertIn("url", response.context["form"].errors)
+
+    def test_newest_first_and_undated_last(self):
+        self.make_entry(title="Old", date=date(2024, 1, 1))
+        self.make_entry(title="Undated", date=None)
+        self.make_entry(title="New", date=date(2026, 1, 1))
+        response = self.client.get(self.url)
+        self.assertEqual(
+            [e.title for e in response.context["entries"]], ["New", "Old", "Undated"]
+        )
+
+    def test_confirm_toggle(self):
+        entry = self.make_entry()
+        url = reverse("achievement_confirm", args=[entry.pk])
+        response = self.client.post(url, follow=True)
+        self.assertContains(response, "Achievement confirmed.")
+        entry.refresh_from_db()
+        self.assertTrue(entry.is_confirmed)
+        response = self.client.post(url, follow=True)
+        self.assertContains(response, "Achievement marked unconfirmed.")
+
+    def test_edit_form_shows_saved_date(self):
+        entry = self.make_entry()
+        response = self.client.get(reverse("achievement_edit", args=[entry.pk]))
+        self.assertContains(response, 'value="2026-06-30"')
+
+    def test_undated_entry_must_get_a_date_when_edited(self):
+        entry = self.make_entry(date=None)
+        response = self.client.post(
+            reverse("achievement_edit", args=[entry.pk]), self.valid_data(date="")
+        )
+        self.assertFormError(response.context["form"], "date", "This field is required.")
+
+    def test_unchanged_save_keeps_confirmation(self):
+        entry = self.make_entry(is_confirmed=True, description="Top 5% of the class.")
+        self.client.post(reverse("achievement_edit", args=[entry.pk]), self.valid_data())
+        entry.refresh_from_db()
+        self.assertTrue(entry.is_confirmed)
+
+    def test_changed_save_resets_confirmation(self):
+        entry = self.make_entry(is_confirmed=True)
+        response = self.client.post(
+            reverse("achievement_edit", args=[entry.pk]),
+            self.valid_data(issuer="Strathmore"),
+            follow=True,
+        )
+        self.assertContains(response, "please confirm it again")
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_confirmed)
+
+    def test_delete_entry(self):
+        entry = self.make_entry()
+        response = self.client.post(reverse("achievement_delete", args=[entry.pk]), follow=True)
+        self.assertContains(response, "Achievement removed.")
+        self.assertEqual(Achievement.objects.count(), 0)
+
+    def test_delete_requires_post(self):
+        entry = self.make_entry()
+        response = self.client.get(reverse("achievement_delete", args=[entry.pk]))
+        self.assertEqual(response.status_code, 405)
+
+    def test_other_users_entry_is_404(self):
+        entry = self.other_entry()
+        for name, method in [
+            ("achievement_edit", self.client.get),
+            ("achievement_edit", self.client.post),
+            ("achievement_confirm", self.client.post),
+            ("achievement_delete", self.client.post),
+        ]:
+            with self.subTest(view=name, method=method.__name__):
+                self.assertEqual(method(reverse(name, args=[entry.pk])).status_code, 404)
+        self.assertEqual(Achievement.objects.count(), 1)
+
+    def test_dashboard_links_to_page(self):
+        response = self.client.get(reverse("dashboard"))
+        self.assertContains(response, self.url)

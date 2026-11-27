@@ -7,15 +7,26 @@ from django.views.decorators.http import require_POST
 from accounts.forms import AccountEmailForm
 
 from .forms import (
+    AchievementForm,
     AdvertForm,
     CareerProfileForm,
+    CertificationForm,
     EducationForm,
     ExperienceForm,
     ProjectForm,
     SkillForm,
 )
 from .matching import match_skills, _found
-from .models import Advert, CareerProfile, Education, Experience, Project, Skill
+from .models import (
+    Achievement,
+    Advert,
+    CareerProfile,
+    Certification,
+    Education,
+    Experience,
+    Project,
+    Skill,
+)
 from .scam import screen_advert
 
 
@@ -167,8 +178,8 @@ def dashboard(request):
         ("Experience", profile.experience_entries, "experience_list"),
         ("Projects", profile.project_entries, "project_list"),
         ("Skills", profile.skills, "skill_list"),
-        ("Certifications", profile.certifications, None),
-        ("Achievements", profile.achievements, None),
+        ("Certifications", profile.certifications, "certification_list"),
+        ("Achievements", profile.achievements, "achievement_list"),
     ]
     
     cards = []
@@ -201,14 +212,16 @@ def skill_list(request):
     skills = Skill.objects.filter(profile=profile).order_by("name")
 
     if request.method == "POST":
-        form = SkillForm(request.POST)
+        form = SkillForm(request.POST, profile=profile)
         if form.is_valid():
             skill = form.save(commit=False)
             skill.profile = profile
             skill.save()
+            form.save_m2m()
+            messages.success(request, "Skill added.")
             return redirect("skill_list")
     else:
-        form = SkillForm()
+        form = SkillForm(profile=profile)
 
     return render(
         request,
@@ -223,8 +236,52 @@ def skill_confirm(request, pk):
     skill = get_object_or_404(Skill, pk=pk, profile__user=request.user)
     skill.is_confirmed = not skill.is_confirmed
     skill.save(update_fields=["is_confirmed", "updated_at"])
+    if skill.is_confirmed:
+        messages.success(request, "Skill confirmed.")
+    else:
+        messages.info(request, "Skill marked unconfirmed.")
     return redirect("skill_list")
 
+
+@login_required
+def skill_edit(request, pk):
+    skill = get_object_or_404(Skill, pk=pk, profile__user=request.user)
+    was_confirmed = skill.is_confirmed
+
+    if request.method == "POST":
+        form = SkillForm(request.POST, instance=skill, profile=skill.profile)
+        if form.is_valid():
+            changed = form.has_changed()
+            skill = form.save(commit=False)
+            if changed:
+                skill.is_confirmed = False
+            skill.save()
+            form.save_m2m()
+            if changed and was_confirmed:
+                messages.warning(
+                    request,
+                    "Skill updated. It changed, so please confirm it again.",
+                )
+            else:
+                messages.success(request, "Skill updated.")
+            return redirect("skill_list")
+    else:
+        form = SkillForm(instance=skill, profile=skill.profile)
+
+    return render(
+        request,
+        "profiles/skill_edit.html",
+        {"form": form, "entry": skill},
+    )
+
+
+@login_required
+@require_POST
+def skill_delete(request, pk):
+    skill = get_object_or_404(Skill, pk=pk, profile__user=request.user)
+    skill.delete()
+    messages.success(request, "Skill removed.")
+    return redirect("skill_list")
 
 @login_required
 def experience_list(request):
@@ -375,6 +432,157 @@ def project_delete(request, pk):
     entry.delete()
     messages.success(request, "Project removed.")
     return redirect("project_list")
+
+@login_required
+def certification_list(request):
+    profile = get_profile(request.user)
+    entries = Certification.objects.filter(profile=profile)
+
+    if request.method == "POST":
+        form = CertificationForm(request.POST)
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.profile = profile
+            entry.save()
+            messages.success(request, "Certification added.")
+            return redirect("certification_list")
+    else:
+        form = CertificationForm()
+
+    return render(
+        request,
+        "profiles/certification_list.html",
+        {"entries": entries, "form": form},
+    )
+
+
+@login_required
+@require_POST
+def certification_confirm(request, pk):
+    entry = get_object_or_404(Certification, pk=pk, profile__user=request.user)
+    entry.is_confirmed = not entry.is_confirmed
+    entry.save(update_fields=["is_confirmed", "updated_at"])
+    if entry.is_confirmed:
+        messages.success(request, "Certification confirmed.")
+    else:
+        messages.info(request, "Certification marked unconfirmed.")
+    return redirect("certification_list")
+
+
+@login_required
+def certification_edit(request, pk):
+    entry = get_object_or_404(Certification, pk=pk, profile__user=request.user)
+    was_confirmed = entry.is_confirmed
+
+    if request.method == "POST":
+        form = CertificationForm(request.POST, instance=entry)
+        if form.is_valid():
+            changed = form.has_changed()
+            entry = form.save(commit=False)
+            if changed:
+                entry.is_confirmed = False
+            entry.save()
+            if changed and was_confirmed:
+                messages.warning(
+                    request,
+                    "Certification updated. It changed, so please confirm it again.",
+                )
+            else:
+                messages.success(request, "Certification updated.")
+            return redirect("certification_list")
+    else:
+        form = CertificationForm(instance=entry)
+
+    return render(
+        request,
+        "profiles/certification_edit.html",
+        {"form": form, "entry": entry},
+    )
+
+
+@login_required
+@require_POST
+def certification_delete(request, pk):
+    entry = get_object_or_404(Certification, pk=pk, profile__user=request.user)
+    entry.delete()
+    messages.success(request, "Certification removed.")
+    return redirect("certification_list")
+
+
+@login_required
+def achievement_list(request):
+    profile = get_profile(request.user)
+    entries = Achievement.objects.filter(profile=profile)
+
+    if request.method == "POST":
+        form = AchievementForm(request.POST)
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.profile = profile
+            entry.save()
+            messages.success(request, "Achievement added.")
+            return redirect("achievement_list")
+    else:
+        form = AchievementForm()
+
+    return render(
+        request,
+        "profiles/achievement_list.html",
+        {"entries": entries, "form": form},
+    )
+
+
+@login_required
+@require_POST
+def achievement_confirm(request, pk):
+    entry = get_object_or_404(Achievement, pk=pk, profile__user=request.user)
+    entry.is_confirmed = not entry.is_confirmed
+    entry.save(update_fields=["is_confirmed", "updated_at"])
+    if entry.is_confirmed:
+        messages.success(request, "Achievement confirmed.")
+    else:
+        messages.info(request, "Achievement marked unconfirmed.")
+    return redirect("achievement_list")
+
+
+@login_required
+def achievement_edit(request, pk):
+    entry = get_object_or_404(Achievement, pk=pk, profile__user=request.user)
+    was_confirmed = entry.is_confirmed
+
+    if request.method == "POST":
+        form = AchievementForm(request.POST, instance=entry)
+        if form.is_valid():
+            changed = form.has_changed()
+            entry = form.save(commit=False)
+            if changed:
+                entry.is_confirmed = False
+            entry.save()
+            if changed and was_confirmed:
+                messages.warning(
+                    request,
+                    "Achievement updated. It changed, so please confirm it again.",
+                )
+            else:
+                messages.success(request, "Achievement updated.")
+            return redirect("achievement_list")
+    else:
+        form = AchievementForm(instance=entry)
+
+    return render(
+        request,
+        "profiles/achievement_edit.html",
+        {"form": form, "entry": entry},
+    )
+
+
+@login_required
+@require_POST
+def achievement_delete(request, pk):
+    entry = get_object_or_404(Achievement, pk=pk, profile__user=request.user)
+    entry.delete()
+    messages.success(request, "Achievement removed.")
+    return redirect("achievement_list")
 
 
 def _run_match(advert):

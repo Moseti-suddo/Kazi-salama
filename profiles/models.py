@@ -152,12 +152,29 @@ class Skill(models.Model):
         blank=True,
     )
     notes = models.TextField(blank=True)
+    supporting_education = models.ManyToManyField(
+        "Education", blank=True, related_name="supported_skills"
+    )
+    supporting_experience = models.ManyToManyField(
+        "Experience", blank=True, related_name="supported_skills"
+    )
+    supporting_projects = models.ManyToManyField(
+        "Project", blank=True, related_name="supported_skills"
+    )
     is_confirmed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
+
+    @property
+    def is_supported(self):
+        return (
+            self.supporting_education.filter(is_confirmed=True).exists()
+            or self.supporting_experience.filter(is_confirmed=True).exists()
+            or self.supporting_projects.filter(is_confirmed=True).exists()
+        )
 
 class Certification(models.Model):
     profile = models.ForeignKey(
@@ -175,6 +192,8 @@ class Certification(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ["-issue_date", "-created_at"]
     def __str__(self):
         return self.name
 
@@ -194,6 +213,8 @@ class Achievement(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = [models.F("date").desc(nulls_last=True), "-created_at"]
     def __str__(self):
         return self.title
 

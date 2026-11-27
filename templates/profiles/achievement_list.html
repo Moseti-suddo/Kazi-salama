@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Achievements | Kazi Salama{% endblock %}
+
+{% block content %}
+<h1>Achievements and awards</h1>
+<p class="lead">Only confirmed entries are used for matching and your resume. Any saved change marks an entry unconfirmed until you confirm it again.</p>
+
+<ul>
+    {% for entry in entries %}
+        <li class="entry">
+            <div>
+                <strong>{{ entry.title }}</strong> · {{ entry.issuer }}<br>
+                {% if entry.date %}<span class="muted">{{ entry.date|date:"M Y" }}</span>{% endif %}
+                {% if entry.description %}
+                    <br><span class="muted">{{ entry.description }}</span>
+                {% endif %}
+                {% if entry.url %}
+                    <br><a href="{{ entry.url }}" target="_blank" rel="noopener noreferrer">{{ entry.url }}</a>
+                {% endif %}
+            </div>
+            <div class="entry-actions">
+                {% if entry.is_confirmed %}
+                    <span class="badge ok">Confirmed</span>
+                {% else %}
+                    <span class="badge warn">Unconfirmed</span>
+                {% endif %}
+                <form method="post" action="{% url 'achievement_confirm' entry.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-small">
+                        {% if entry.is_confirmed %}Unconfirm{% else %}Confirm{% endif %}
+                    </button>
+                </form>
+                <a href="{% url 'achievement_edit' entry.pk %}">Edit</a>
+                <form method="post" action="{% url 'achievement_delete' entry.pk %}" onsubmit="return confirm('Remove this achievement?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-small">Remove</button>
+                </form>
+            </div>
+        </li>
+    {% empty %}
+        <li>No achievements yet.</li>
+    {% endfor %}
+</ul>
+
+<h2>Add achievement or award</h2>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+        <div class="field">{{ field.as_field_group }}</div>
+    {% endfor %}
+    <button type="submit">Save achievement</button>
+</form>
+{% endblock %}

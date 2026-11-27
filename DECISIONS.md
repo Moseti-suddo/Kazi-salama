@@ -36,7 +36,7 @@ New users are signed in immediately after registering. There is no email verific
 
 ## Profile creation
 
-Profile information will be entered through forms and a guided wizard. The wizard is not built yet; entry pages with add and confirm exist for Education, Experience, Projects and Skills, and Education, Experience and Projects also have edit and remove.
+Profile information will be entered through forms and a guided wizard. The wizard is not built yet; entry pages with add, confirm, edit and remove exist for Education, Experience, Projects, Skills, Certifications and Achievements.
 
 CV upload will come later. It may extract suggested details, but it must not silently confirm or add them to the profile.
 
@@ -93,6 +93,22 @@ The URL field gets no custom `clean_url()`. Django 6's form `URLField` already a
 Ordering, edit, remove, confirm and messages follow Experience (Feature 4): current projects first, then newest end date, then newest start date, then `-created_at` (migration 0010, no SQL), and a saved change resets confirmation.
 
 The resume still shows only name, role, description and technologies for projects. Adding outcomes, URL and dates was left for Feature 12 to keep this feature focused.
+
+## Skills, Certifications and Achievements (Features 6 and 7, 2026-11-27)
+
+Built together at the user's request, because both are plain entry types that follow the Projects pattern. Edit, remove, confirm and messages are the same as for Projects, including resetting confirmation when a saved edit changes a value.
+
+**Supporting evidence for skills.** A skill links to Education, Experience and Project entries through three ManyToMany fields on `Skill` (`supporting_education`, `supporting_experience`, `supporting_projects`, one migration). A separate `SkillEvidence` table was rejected as more code and more migration risk for the same result; keeping every skill "Claimed" was rejected because it left the Claimed or Supported rule unmet.
+
+`Skill.is_supported` is a property, not a stored column, so it can never disagree with the links. It counts only confirmed linked entries, following the rule that unconfirmed facts are not used. Unconfirming a linked entry therefore turns the skill back to Claimed. Changing only a skill's links counts as a change and resets its confirmation. Matching and the resume do not use the links yet.
+
+`SkillForm` takes the user's profile. It limits the evidence checkboxes to that user's own entries, so a crafted request cannot link someone else's entry, and it makes the duplicate check per user. Filtering in the view was rejected because it would have to be repeated in add and edit.
+
+**Duplicate skills** are rejected in the form, ignoring case and surrounding spaces, with the skill's own row excluded on edit. A database unique constraint was rejected because the migration fails if duplicates already exist. Django Admin bypasses the rule.
+
+**Certifications.** No model fields were added. An expiry date before the issue date is rejected on `expiry_date`. `validate_date_range()` was not reused because it is tied to `start_date` and `end_date`, and changing that tested helper was not worth it for one other pair. Ordering is newest issue date first.
+
+**Achievements.** The spec says the date is required but the model allows it blank. It is required in the form only, so no migration was needed and an old undated row still loads; it must get a date when edited. Making the model field required was rejected because the migration fails if any row is blank. Ordering is newest date first with undated entries last, unlike the other entry types where a blank date means "current", because here blank means unknown.
 
 ## Confirmation
 
