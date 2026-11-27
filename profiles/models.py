@@ -194,8 +194,13 @@ class Certification(models.Model):
 
     class Meta:
         ordering = ["-issue_date", "-created_at"]
+
     def __str__(self):
         return self.name
+
+    @property
+    def is_expired(self):
+        return self.expiry_date is not None and self.expiry_date < timezone.localdate()
 
 
 class Achievement(models.Model):

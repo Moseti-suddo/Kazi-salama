@@ -1386,3 +1386,143 @@ class AchievementPageTests(TestCase):
     def test_dashboard_links_to_page(self):
         response = self.client.get(reverse("dashboard"))
         self.assertContains(response, self.url)
+
+class ResumePageTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("amina", "amina@example.com", PASSWORD)
+        self.client.force_login(self.user)
+        self.profile = CareerProfile.objects.create(
+            user=self.user, full_name="Amina Otieno", profile_confirmed=True
+        )
+        self.advert = self.profile.adverts.create(
+            title="Data Analyst",
+            text="We need Python and SQL.",
+            risk_level="Low",
+            match_score=50,
+        )
+        self.url = reverse("advert_resume", args=[self.advert.pk])
+
+    def test_resume_shows_name_when_details_confirmed(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Amina Otieno")
+
+    def test_unconfirmed_details_redirect_to_profile_with_warning(self):
+        self.profile.profile_confirmed = False
+        self.profile.save()
+        response = self.client.get(self.url, follow=True)
+        self.assertRedirects(response, reverse("profile_edit"))
+        self.assertContains(response, "confirm your personal details")
+
+    def test_blank_name_redirects_even_if_confirmed(self):
+        self.profile.full_name = ""
+        self.profile.save()
+        response = self.client.get(self.url)
+        self.assertRedirects(response, reverse("profile_edit"))
+
+    def test_unmatched_advert_still_redirects_to_detail(self):
+        self.advert.match_score = None
+        self.advert.save()
+        response = self.client.get(self.url)
+        self.assertRedirects(response, reverse("advert_detail", args=[self.advert.pk]))
+
+    def test_project_shows_results_url_and_dates(self):
+        self.profile.project_entries.create(
+            name="Crop Tracker", description="Tracks crops.", role="Lead",
+            technologies="Python", outcomes="Cut waste by 20%.",
+            url="https://example.com/crops", start_date=date(2026, 1, 1),
+            is_current=True, is_confirmed=True,
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "Cut waste by 20%.")
+        self.assertContains(response, "https://example.com/crops")
+        self.assertContains(response, "Jan 2026 - Present")
+
+    def test_unconfirmed_project_left_out(self):
+        self.profile.project_entries.create(
+            name="Secret Project", description="x", role="y", technologies="z",
+        )
+        self.assertNotContains(self.client.get(self.url), "Secret Project")
+
+    def test_expected_education_is_marked(self):
+        future = timezone.localdate() + timedelta(days=400)
+        self.profile.education_entries.create(
+            institution="UoN", qualification="BSc", field_of_study="CS",
+            end_date=future, is_confirmed=True,
+        )
+        self.assertContains(self.client.get(self.url), "Expected")
+
+    def test_past_education_is_not_marked_expected(self):
+        self.profile.education_entries.create(
+            institution="UoN", qualification="BSc", field_of_study="CS",
+            end_date=date(2020, 7, 1), is_confirmed=True,
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "Jul 2020")
+        self.assertNotContains(response, "Expected")
+
+    def test_confirmed_certification_and_achievement_shown(self):
+        self.profile.certifications.create(
+            name="Google Data Analytics", provider="Coursera",
+            issue_date=date(2026, 3, 15), is_confirmed=True,
+        )
+        self.profile.achievements.create(
+            title="Dean's List", issuer="UoN", date=date(2025, 6, 1), is_confirmed=True,
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "Google Data Analytics")
+        self.assertContains(response, "Dean&#x27;s List")
+
+    def test_unconfirmed_certification_and_achievement_left_out(self):
+        self.profile.certifications.create(
+            name="Hidden Cert", provider="X", issue_date=date(2026, 3, 15),
+        )
+        self.profile.achievements.create(title="Hidden Award", issuer="X", date=date(2025, 6, 1))
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "Hidden Cert")
+        self.assertNotContains(response, "Hidden Award")
+
+    def test_expired_certification_marked_on_resume(self):
+        self.profile.certifications.create(
+            name="Old Cert", provider="X", issue_date=date(2020, 1, 1),
+            expiry_date=date(2022, 1, 1), is_confirmed=True,
+        )
+        self.assertContains(self.client.get(self.url), "Expired Jan 2022")
+
+    def test_only_certifications_counts_as_content(self):
+        self.profile.certifications.create(
+            name="Only Cert", provider="X", issue_date=date(2026, 3, 15), is_confirmed=True,
+        )
+        self.assertNotContains(self.client.get(self.url), "No confirmed entries yet")
+
+
+class CertificationExpiryTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("amina", "amina@example.com", PASSWORD)
+        self.client.force_login(self.user)
+        self.profile = CareerProfile.objects.create(user=self.user, full_name="Amina Otieno")
+
+    def make(self, expiry):
+        return self.profile.certifications.create(
+            name="Cert", provider="X", issue_date=date(2020, 1, 1), expiry_date=expiry,
+        )
+
+    def test_past_expiry_is_expired(self):
+        self.assertTrue(self.make(timezone.localdate() - timedelta(days=1)).is_expired)
+
+    def test_today_and_future_expiry_are_not_expired(self):
+        self.assertFalse(self.make(timezone.localdate()).is_expired)
+        self.assertFalse(self.make(timezone.localdate() + timedelta(days=30)).is_expired)
+
+    def test_no_expiry_is_not_expired(self):
+        self.assertFalse(self.make(None).is_expired)
+
+    def test_list_shows_expired_badge(self):
+        self.make(date(2022, 1, 1))
+        response = self.client.get(reverse("certification_list"))
+        self.assertContains(response, "badge warn\">Expired")
+
+    def test_list_has_no_expired_badge_for_valid_certificate(self):
+        self.make(timezone.localdate() + timedelta(days=365))
+        response = self.client.get(reverse("certification_list"))
+        self.assertNotContains(response, "badge warn\">Expired")

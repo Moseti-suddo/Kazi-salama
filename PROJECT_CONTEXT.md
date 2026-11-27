@@ -58,7 +58,7 @@ Built so far: step 1, steps 4 (for personal details, Education, Experience, Proj
 
 Edit and remove exist for personal details (edit only), Education, Experience, Projects, Skills, Certifications and Achievements.
 
-Not built: wizard, Save Draft, review screen, URL submission, partial matches, supporting profile evidence in match results (skills can be linked to supporting entries, but matching does not use the links yet), certifications and achievements on the resume, notes form, next action, reminder date, status history.
+Not built: wizard, Save Draft, review screen, URL submission, partial matches, supporting profile evidence in match results (skills can be linked to supporting entries, but matching does not use the links yet), notes form, next action, reminder date, status history.
 
 ## 4. Career Profile Sections
 
@@ -274,6 +274,8 @@ cd ~/Projects/kazi-salama
 source .venv/bin/activate
 ```
 
+Secret key: Django reads `DJANGO_SECRET_KEY` from the environment. It is stored in `.env` in the project root (gitignored, never commit it) and loaded by a block at the end of `.venv/bin/activate`. That block is not in git, so it must be re-added if the venv is recreated. If Django fails with `KeyError: 'DJANGO_SECRET_KEY'`, see Known issues in PROJECT_STATUS.md for the fix.
+
 PostgreSQL database:
 
 - Database: `kazi_salama`
@@ -306,7 +308,7 @@ Profiles app files:
 - `profiles/models.py`, `forms.py`, `views.py`, `urls.py`, `admin.py`
 - `profiles/scam.py` (scam rules)
 - `profiles/matching.py` (skill matching)
-- `profiles/tests.py` (146 tests: 5 scam/matching, 17 profile page, 20 education page, 23 experience page, 25 project page, 24 skill page, 17 certification page, 15 achievement page)
+- `profiles/tests.py` (163 tests: 5 scam/matching, 17 profile page, 20 education page, 23 experience page, 25 project page, 24 skill page, 17 certification page, 15 achievement page, 12 resume page, 5 certification expiry)
 - `profiles/migrations/0001` to `0011` (0008, 0009 and 0010 change Education, Experience and Project ordering only and run no SQL; 0011 adds the three skill-evidence join tables and sets Certification and Achievement ordering)
 
 Templates (Django searches both folders: `DIRS` and `APP_DIRS`):

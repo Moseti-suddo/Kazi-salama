@@ -106,6 +106,22 @@ Core demo flow built: profile entries, confirmation, advert screening, skill mat
   - Browser check (16 checks) reported all passing by the user: sidebar and dashboard links, evidence checkbox labels, Supported flipping to Claimed when a linked project is unconfirmed, duplicate error, edit pre-fill and confirmation reset (including a links-only change), remove cancel and OK, dark mode, certification expiry error and date line, required fields, newest-first ordering, achievement required date, 404 for unknown entries, matching still works with a confirmed skill
   - Slips fixed during the build: `SkillForm` first used `profile.projects`, but the real related name is `project_entries` (found by reading `models.py`; `manage.py check` could not catch it because the lookup runs only when the form is created)
 
+- Secret key moved to the environment, 2026-11-27:
+  - `config/settings.py`: `SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]`, no fallback, so a missing variable fails loudly instead of silently using a default
+  - New key generated with `secrets.token_urlsafe(50)` and stored in `.env` (gitignored; `git check-ignore -v .env` confirmed). `.venv/bin/activate` loads it on activation (see Known issues)
+  - `python manage.py check`: no issues, and `python manage.py test`: 156 tests pass, both seen 2026-11-27 with the variable loaded
+  - With the variable removed (`env -u DJANGO_SECRET_KEY python manage.py check`), Django stops with `KeyError: 'DJANGO_SECRET_KEY'`, seen 2026-11-27
+  - Not yet committed
+- Small gaps, 2026-11-27 (resume, Admin, expired certificates):
+  - `profiles/views.py` `advert_resume`: if personal details are unconfirmed or the full name is blank, it redirects to `/profile/` with a warning (checked after the "not matched yet" redirect). It also passes confirmed certifications and achievements to the template; `has_content` counts them
+  - `templates/profiles/resume.html`: projects show results, URL and date line; education shows "Expected Mon YYYY" for future end dates and month and year otherwise; new Certifications section (shows "Expired" or "Expires" with the expiry date) and Achievements section, confirmed entries only
+  - `profiles/models.py`: `Certification.is_expired` property (expiry date before today, computed when shown, no column). `templates/profiles/certification_list.html`: "Expired" label and badge
+  - `profiles/admin.py`: Education, Experience, Project, Skill (with `filter_horizontal` for the evidence links), Certification and Achievement registered with list columns, filters and search
+  - `profiles/tests.py`: 17 new tests (12 `ResumePageTests`, 5 `CertificationExpiryTests`)
+  - `makemigrations --check --dry-run`: `No changes detected`; `python manage.py check`: no issues; `python manage.py test`: 173 tests pass (10 accounts + 163 profiles), all run and seen 2026-11-27
+  - Not checked in the browser or in Admin yet; the Admin pages were never opened
+  - Not yet committed
+
 ## Code provided, not yet verified
 
 - High-risk path: matching skipped, override button
@@ -130,23 +146,29 @@ Checked the documentation against the code:
 ## Known issues
 
 - Always run `source .venv/bin/activate` first. The system Python has Django 5.2.17, which created the faulty migration 0006. Check that the prompt shows `(.venv)`.
-- `MAILERS` in `settings.py`: earlier notes called it "not a Django setting", but the comment above it links to the Django 6.1 email docs and the venv runs 6.1.3, so it may be the real 6.1 setting. Not verified yet. Check before changing it, when password-reset email comes up.
-- `SECRET_KEY` is committed in `settings.py`. Acceptable for local development only. Move to an environment variable before sharing or deploying.
+- `MAILERS` in `settings.py` is a real Django 6.1 setting (found in the installed Django 6.1.3 source, 2026-11-27). It uses the console backend, so emails print to the terminal and nothing is sent. Nothing in the app sends email yet.
+- `SECRET_KEY` now comes from the `DJANGO_SECRET_KEY` environment variable (`os.environ["DJANGO_SECRET_KEY"]` in `settings.py`). The old key is still in the first commit's history and is no longer used. `DEBUG = True` and `ALLOWED_HOSTS = []` are still hard-coded; move them to the environment before deploying.
+- **If Django fails with `KeyError: 'DJANGO_SECRET_KEY'`:** the variable is not loaded. The key lives in `.env` in the project root (gitignored, never commit it). The venv's `.venv/bin/activate` has a block at the end that loads `.env` on activation. `.venv/` is gitignored, so that block exists only on this machine. If the venv is deleted or recreated, or the project is cloned elsewhere: (1) create `.env` containing `DJANGO_SECRET_KEY=<new key>`, generated with `python -c "import secrets; print(secrets.token_urlsafe(50))"`; (2) append this to `.venv/bin/activate`:
+  ```bash
+  # Load project secrets (Kazi Salama)
+  if [ -f "$VIRTUAL_ENV/../.env" ]; then
+      set -a
+      . "$VIRTUAL_ENV/../.env"
+      set +a
+  fi
+  ```
+  (3) run `source .venv/bin/activate` again. Check with `test -n "$DJANGO_SECRET_KEY" && echo set || echo missing`.
 - Skill duplicates are rejected in the form only (ignoring case, per user). There is no database constraint, so Django Admin can still create duplicates.
 - Skill categories limited to five fixed choices
 - A skill linked to an entry stays linked if the entry is later unconfirmed, but it then shows "Claimed" until the entry is confirmed again. Deleting a linked entry removes the link silently.
 - Supporting links are not used by matching or the resume yet. They only drive the Supported or Claimed badge.
 - Achievement `date` is required in the form but not the model, so an old undated row can exist and must get a date when edited
-- Certification expiry is stored and shown, but nothing warns about an expired certification
-- Resume (Feature 12): projects show only name, role, description and technologies; outcomes, URL and dates are left out
-- Django Admin registers only `CareerProfile`; Education, Experience, Projects and the other entry types are not in Admin
-- Resume (Feature 12): it shows only the education end-date year and does not mark expected completion dates
-- Resume (Feature 12): it uses personal details even when `profile_confirmed` is False, and prints an empty heading if the full name is blank (possible because `get_profile()` creates profiles with a blank name)
+- Django Admin now registers every entry type, but it bypasses the form rules (date ranges, duplicate skills) and does not reset `is_confirmed` when an entry changes. Use it to inspect and fix data, not to add entries.
 - Scam rule weights and thresholds are starting values. They have not been validated against real adverts.
 - Matching only recognises the fixed `KNOWN_SKILLS` list plus the user's confirmed skills. Unusual skills in an advert are missed. No partial-match category yet.
 - LLM extraction is not built. The rule engine and fixed skill list do all the work.
 - Resume generation is built although earlier documents listed CV generation as deferred. See DECISIONS.md.
-- Certifications and Achievements are not shown on the resume and are not used by matching
+- Certifications and Achievements are shown on the resume but are not used by matching or for ordering
 - Edit and remove exist for every profile entry type; personal details have edit only, by decision
 - No status history, notes, next action or reminder date on adverts (only current status and deadline)
 - No wizard, Save Draft or Review and Confirm screen
@@ -161,7 +183,7 @@ Working one feature at a time, end to end (model → views → tests → browser
 
 Feature order: 0 Foundation (done) → 1 Accounts (done) → 2 Personal details (done) → 3 Education (done) → 4 Experience (done) → 5 Projects (done) → 6 Skills (done) → 7 Certifications and Achievements (done) → 8 Wizard and Review → 9 Advert screening → 10 Matching → 11 Tracker → 12 Resume
 
-Features 0 and 1 were committed as `0e732e7`, Feature 2 as `2a7a19e`, Feature 3 as `6802dc7` and Feature 4 as `bab2493` and Feature 5 as `0b7c230`. Features 6 and 7 are not committed yet. The commit should hold the modified `forms.py`, `models.py`, `tests.py`, `urls.py`, `views.py`, `base.html`, `skill_list.html`, migration 0011, the five new templates and the three docs; leave out `notes.txt`.
+Features 0 and 1 were committed as `0e732e7`, Feature 2 as `2a7a19e`, Feature 3 as `6802dc7` and Feature 4 as `bab2493` and Feature 5 as `0b7c230`. Features 6 and 7 were committed as `18b3e78`. The secret-key change is not committed yet; leave out `notes.txt` and `.env`.
 
 Next: Feature 8, Wizard and Review. Step 1 is a read-only review of what exists (the entry pages, the dashboard counts, the confirm toggles) against PROJECT_CONTEXT.md section 5 (multi-step wizard with Next, Back and Save Draft; allow incomplete drafts; a final Review and Confirm screen; confirm entries individually). Decide first how a draft differs from an unconfirmed entry, since entries already save as unconfirmed. HTMX and Tailwind stay deferred unless this step needs them. Do not start GitHub evidence, CV extraction, ad collection or the daily agent before this is done.
 

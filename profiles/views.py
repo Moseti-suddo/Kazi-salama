@@ -666,6 +666,13 @@ def advert_resume(request, pk):
         return redirect("advert_detail", pk=pk)
 
     profile = advert.profile
+    if not profile.profile_confirmed or not profile.full_name.strip():
+        messages.warning(
+            request,
+            "Add your full name and confirm your personal details before generating a resume.",
+        )
+        return redirect("profile_edit")
+
     confirmed_skills = list(profile.skills.filter(is_confirmed=True))
     result = match_skills(advert.text, [s.name for s in confirmed_skills])
     keywords = result["matched"]
@@ -680,6 +687,8 @@ def advert_resume(request, pk):
         key=lambda p: -_relevance(f"{p.technologies} {p.description}", keywords),
     )
     education = profile.education_entries.filter(is_confirmed=True)
+    certifications = profile.certifications.filter(is_confirmed=True)
+    achievements = profile.achievements.filter(is_confirmed=True)
 
     return render(request, "profiles/resume.html", {
         "advert": advert,
@@ -689,6 +698,10 @@ def advert_resume(request, pk):
         "experience": experience,
         "projects": projects,
         "education": education,
+        "certifications": certifications,
+        "achievements": achievements,
         "keywords": keywords,
-        "has_content": bool(skills or experience or projects or education),
+        "has_content": bool(
+            skills or experience or projects or education or certifications or achievements
+        ),
     })

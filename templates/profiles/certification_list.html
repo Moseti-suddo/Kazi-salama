@@ -12,8 +12,9 @@
             <div>
                 <strong>{{ entry.name }}</strong> · {{ entry.provider }}<br>
                 <span class="muted">
-                    Issued {{ entry.issue_date|date:"M Y" }}{% if entry.expiry_date %} · Expires {{ entry.expiry_date|date:"M Y" }}{% endif %}
+                    Issued {{ entry.issue_date|date:"M Y" }}{% if entry.expiry_date %} · {% if entry.is_expired %}Expired{% else %}Expires{% endif %} {{ entry.expiry_date|date:"M Y" }}{% endif %}
                 </span>
+                {% if entry.is_expired %}<span class="badge warn">Expired</span>{% endif %}
                 {% if entry.description %}
                     <br><span class="muted">{{ entry.description }}</span>
                 {% endif %}

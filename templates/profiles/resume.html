@@ -59,9 +59,12 @@
 <h2>Projects</h2>
 {% for p in projects %}
 <div class="item">
-    <strong>{{ p.name }}</strong> <span class="meta">({{ p.role }})</span>
+    <div class="row"><span><strong>{{ p.name }}</strong> <span class="meta">({{ p.role }})</span></span>
+        <span class="meta">{% if p.start_date %}{{ p.start_date|date:"M Y" }} - {% if p.is_current %}Present{% elif p.end_date %}{{ p.end_date|date:"M Y" }}{% endif %}{% elif p.is_current %}Present{% elif p.end_date %}{{ p.end_date|date:"M Y" }}{% endif %}</span></div>
     <div>{{ p.description|linebreaksbr }}</div>
+    {% if p.outcomes %}<div>Results: {{ p.outcomes|linebreaksbr }}</div>{% endif %}
     <div class="meta">Technologies: {{ p.technologies }}</div>
+    {% if p.url %}<div class="meta">{{ p.url }}</div>{% endif %}
 </div>
 {% endfor %}
 {% endif %}
@@ -71,8 +74,32 @@
 {% for ed in education %}
 <div class="item">
     <div class="row"><strong>{{ ed.qualification }}, {{ ed.field_of_study }}</strong>
-        <span class="meta">{% if ed.end_date %}{{ ed.end_date|date:"Y" }}{% endif %}</span></div>
+        <span class="meta">{% if ed.end_date %}{% if ed.is_expected %}Expected {% endif %}{{ ed.end_date|date:"M Y" }}{% endif %}</span></div>
     <div class="meta">{{ ed.institution }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if certifications %}
+<h2>Certifications</h2>
+{% for c in certifications %}
+<div class="item">
+    <div class="row"><strong>{{ c.name }}</strong>
+        <span class="meta">{{ c.issue_date|date:"M Y" }}{% if c.expiry_date %} - {% if c.is_expired %}Expired {% else %}Expires {% endif %}{{ c.expiry_date|date:"M Y" }}{% endif %}</span></div>
+    <div class="meta">{{ c.provider }}</div>
+    {% if c.description %}<div>{{ c.description|linebreaksbr }}</div>{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if achievements %}
+<h2>Achievements</h2>
+{% for a in achievements %}
+<div class="item">
+    <div class="row"><strong>{{ a.title }}</strong>
+        <span class="meta">{% if a.date %}{{ a.date|date:"M Y" }}{% endif %}</span></div>
+    <div class="meta">{{ a.issuer }}</div>
+    {% if a.description %}<div>{{ a.description|linebreaksbr }}</div>{% endif %}
 </div>
 {% endfor %}
 {% endif %}
