@@ -15,7 +15,7 @@ jobs:
         image: postgres:18
         env:
           POSTGRES_DB: kazi_salama
-          POSTGRES_USER: postgres
+          POSTGRES_USER: mosetea
           POSTGRES_PASSWORD: testpassword
         ports:
           - 5432:5432
@@ -43,7 +43,7 @@ jobs:
         env:
           DJANGO_SECRET_KEY: "ci-insecure-placeholder-key-for-testing"
           PGDATABASE: kazi_salama
-          PGUSER: postgres
+          PGUSER: mosetea
           PGPASSWORD: testpassword
           PGHOST: localhost
           PGPORT: 5432
